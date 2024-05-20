@@ -174,6 +174,7 @@ def train_multitask(args):
     device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
     # Load data
     # Create the data and its corresponding datasets and dataloader
+    print("========================Loading data========================")
     sst_train_data, num_labels,para_train_data, sts_train_data = load_multitask_data(args.sst_train,args.para_train,args.sts_train, split ='train')
     sst_dev_data, num_labels,para_dev_data, sts_dev_data = load_multitask_data(args.sst_dev,args.para_dev,args.sts_dev, split ='train')
 
@@ -184,6 +185,7 @@ def train_multitask(args):
                                       collate_fn=sst_train_data.collate_fn)
     sst_dev_dataloader = DataLoader(sst_dev_data, shuffle=False, batch_size=args.batch_size,
                                     collate_fn=sst_dev_data.collate_fn)
+    print("========================Data loaded========================")
 
     # Init model
     config = {'hidden_dropout_prob': args.hidden_dropout_prob,
@@ -196,13 +198,15 @@ def train_multitask(args):
 
     model = MultitaskBERT(config)
     model = model.to(device)
+    print("========================Model Created========================")
 
     lr = args.lr
     optimizer = AdamW(model.parameters(), lr=lr)
     best_dev_acc = 0
 
+    print("========================Training========================")
     # Run for the specified number of epochs
-    for epoch in range(args.epochs):
+    for epoch in tqdm(range(args.epochs)):
         model.train()
         train_loss = 0
         num_batches = 0
@@ -282,7 +286,7 @@ def get_args():
     parser.add_argument("--sts_test_out", type=str, default="predictions/sts-test-output.csv")
 
     # hyper parameters
-    parser.add_argument("--batch_size", help='sst: 64, cfimdb: 8 can fit a 12GB GPU', type=int, default=8)
+    parser.add_argument("--batch_size", help='sst: 64, cfimdb: 8 can fit a 12GB GPU', type=int, default=2)
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.3)
     parser.add_argument("--lr", type=float, help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
                         default=1e-5)
