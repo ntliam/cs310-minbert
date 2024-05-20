@@ -1,0 +1,8 @@
+•For default project
+•You get 60% of total scores if you implement the sentiment classification task only
+•You get 80% if you implement all three tasks (sentiment, paraphrase, and semantic) and get the multi-task training loop working
+•You get 90% if you do additional optimization over the training procedure or model architecture
+•You get 95% to 100% with well written project report and good presentation
+•Performance matters but is not the determining factor (good acc/F-1 scores gives around 5% advantage to your total score)
+•For custom project
+•Will be graded case by case with consideration over multiple factors: innovation, difficulty, workload, performance etc.
