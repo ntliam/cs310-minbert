@@ -55,7 +55,7 @@ class MultitaskBERT(nn.Module):
         # raise NotImplementedError
 
         self.sentiment_classifier = nn.Sequential(
-            nn.Linear(BERT_HIDDEN_SIZE, N_SENTIMENT_CLASSES),
+            nn.Linear(BERT_HIDDEN_SIZE, BERT_HIDDEN_SIZE),
             nn.BatchNorm1d(BERT_HIDDEN_SIZE),
             nn.GELU(),
             nn.Dropout(config.hidden_dropout_prob),
@@ -63,7 +63,7 @@ class MultitaskBERT(nn.Module):
         )
 
         self.paraphrase_classifier = nn.Sequential(
-            nn.Linear(BERT_HIDDEN_SIZE * 2, N_SENTIMENT_CLASSES),
+            nn.Linear(BERT_HIDDEN_SIZE * 2, BERT_HIDDEN_SIZE),
             nn.BatchNorm1d(BERT_HIDDEN_SIZE),
             nn.GELU(),
             nn.Dropout(config.hidden_dropout_prob),
@@ -81,6 +81,8 @@ class MultitaskBERT(nn.Module):
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
 
+
+
     def forward(self, input_ids, attention_mask):
         'Takes a batch of sentences and produces embeddings for them.'
         # The final BERT embedding is the hidden state of [CLS] token (the first token)
@@ -90,11 +92,9 @@ class MultitaskBERT(nn.Module):
         ### TODO
         # raise NotImplementedError
         outputs = self.bert(input_ids, attention_mask)
-        cls_output = outputs[0][:, 0, :]
+        cls_output = outputs['last_hidden_state'][:, 0, :]
 
         return cls_output
-
-
     def predict_sentiment(self, input_ids, attention_mask):
         '''Given a batch of sentences, outputs logits for classifying sentiment.
         There are 5 sentiment classes:
