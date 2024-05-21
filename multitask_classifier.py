@@ -56,7 +56,7 @@ class MultitaskBERT(nn.Module):
         # raise NotImplementedError
 
         self.sentiment_classifier = nn.Sequential(
-            nn.Linear(BERT_HIDDEN_SIZE, N_SENTIMENT_CLASSES),
+            nn.Linear(BERT_HIDDEN_SIZE, BERT_HIDDEN_SIZE),
             nn.BatchNorm1d(BERT_HIDDEN_SIZE),
             nn.GELU(),
             nn.Dropout(config.hidden_dropout_prob),
@@ -64,7 +64,7 @@ class MultitaskBERT(nn.Module):
         )
 
         self.paraphrase_classifier = nn.Sequential(
-            nn.Linear(BERT_HIDDEN_SIZE * 2, N_SENTIMENT_CLASSES),
+            nn.Linear(BERT_HIDDEN_SIZE * 2, BERT_HIDDEN_SIZE),
             nn.BatchNorm1d(BERT_HIDDEN_SIZE),
             nn.GELU(),
             nn.Dropout(config.hidden_dropout_prob),
@@ -82,6 +82,8 @@ class MultitaskBERT(nn.Module):
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
 
+
+
     def forward(self, input_ids, attention_mask):
         'Takes a batch of sentences and produces embeddings for them.'
         # The final BERT embedding is the hidden state of [CLS] token (the first token)
@@ -91,11 +93,9 @@ class MultitaskBERT(nn.Module):
         ### TODO
         # raise NotImplementedError
         outputs = self.bert(input_ids, attention_mask)
-        cls_output = outputs[0][:, 0, :]
+        cls_output = outputs['last_hidden_state'][:, 0, :]
 
         return cls_output
-
-
     def predict_sentiment(self, input_ids, attention_mask):
         '''Given a batch of sentences, outputs logits for classifying sentiment.
         There are 5 sentiment classes:
@@ -175,6 +175,7 @@ def train_multitask(args, save_metrics):
     device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
     # Load data
     # Create the data and its corresponding datasets and dataloader
+    print("========================Loading data========================")
     sst_train_data, num_labels,para_train_data, sts_train_data = load_multitask_data(args.sst_train,args.para_train,args.sts_train, split ='train')
     sst_dev_data, num_labels,para_dev_data, sts_dev_data = load_multitask_data(args.sst_dev,args.para_dev,args.sts_dev, split ='train')
 
@@ -185,6 +186,7 @@ def train_multitask(args, save_metrics):
                                       collate_fn=sst_train_data.collate_fn)
     sst_dev_dataloader = DataLoader(sst_dev_data, shuffle=False, batch_size=args.batch_size,
                                     collate_fn=sst_dev_data.collate_fn)
+    print("========================Data loaded========================")
 
     # Init model
     config = {'hidden_dropout_prob': args.hidden_dropout_prob,
@@ -197,13 +199,15 @@ def train_multitask(args, save_metrics):
 
     model = MultitaskBERT(config)
     model = model.to(device)
+    print("========================Model Created========================")
 
     lr = args.lr
     optimizer = AdamW(model.parameters(), lr=lr)
     best_dev_acc = 0
 
+    print("========================Training========================")
     # Run for the specified number of epochs
-    for epoch in range(args.epochs):
+    for epoch in tqdm(range(args.epochs)):
         model.train()
         train_loss = 0
         num_batches = 0
