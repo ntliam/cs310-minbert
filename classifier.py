@@ -1,6 +1,7 @@
 import time, random, numpy as np, argparse, sys, re, os
 from types import SimpleNamespace
 import csv
+import json
 
 import torch
 import torch.nn.functional as F
@@ -238,7 +239,7 @@ def save_model(model, optimizer, args, config, filepath):
     print(f"save the model to {filepath}")
 
 
-def train(args):
+def train(args, save_metrics):
     device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
     # Load data
     # Create the data and its corresponding datasets and dataloader
@@ -302,9 +303,15 @@ def train(args):
             save_model(model, optimizer, args, config, args.filepath)
 
         print(f"Epoch {epoch}: train loss :: {train_loss :.3f}, train acc :: {train_acc :.3f}, dev acc :: {dev_acc :.3f}")
+        save_metrics["train_loss"].append(train_loss)
+        save_metrics["train_acc"].append(train_acc)
+        save_metrics["dev_acc"].append(dev_acc)
+        save_metrics["train_f1"].append(train_f1)
+        save_metrics["dev_f1"].append(dev_f1)
 
 
-def test(args):
+
+def test(args, save_metrics):
     with torch.no_grad():
         device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
         saved = torch.load(args.filepath)
@@ -326,6 +333,7 @@ def test(args):
         print('DONE DEV')
         test_pred, test_sents, test_sent_ids = model_test_eval(test_dataloader, model, device)
         print('DONE Test')
+        save_metrics["test_acc"].append(dev_acc)
         with open(args.dev_out, "w+") as f:
             print(f"dev acc :: {dev_acc :.3f}")
             f.write(f"id \t Predicted_Sentiment \n")
@@ -377,10 +385,26 @@ if __name__ == "__main__":
         test_out = 'predictions/'+args.option+'-sst-test-out.csv'
     )
 
-    train(config)
+    sst_save_metrics = {
+        "epoch": [],
+        "train_loss": [],
+        "train_acc": [],
+        "train_f1": [],
+        "dev_acc": [],
+        "dev_f1": [],
+        "test_acc": []
+    }
+
+    train(config, sst_save_metrics)
 
     print('Evaluating on SST...')
-    test(config)
+    test(config, sst_save_metrics)
+
+    # Save save_metrics to a JSON file
+    with open('sst_classifier_saved_metrics.json', 'w') as f:
+        json.dump(sst_save_metrics, f, indent=4)
+
+    print('Metrics saved to sst_classifier_saved_metrics.json')
 
     print('Training Sentiment Classifier on cfimdb...')
     config = SimpleNamespace(
@@ -398,7 +422,23 @@ if __name__ == "__main__":
         test_out = 'predictions/'+args.option+'-cfimdb-test-out.csv'
     )
 
-    train(config)
+    cfimdb_save_metrics = {
+        "epoch": [],
+        "train_loss": [],
+        "train_acc": [],
+        "train_f1": [],
+        "dev_acc": [],
+        "dev_f1": [],
+        "test_acc": []
+    }
+
+    train(config, cfimdb_save_metrics)
 
     print('Evaluating on cfimdb...')
-    test(config)
+    test(config, cfimdb_save_metrics)
+
+    # Save save_metrics to a JSON file
+    with open('cfimdb_classifier_saved_metrics.json', 'w') as f:
+        json.dump(cfimdb_save_metrics, f, indent=4)
+
+    print('Metrics saved to cfimdb_classifier_saved_metrics.json')

@@ -1,5 +1,6 @@
 import time, random, numpy as np, argparse, sys, re, os
 from types import SimpleNamespace
+import json
 
 import torch
 from torch import nn
@@ -170,7 +171,7 @@ def save_model(model, optimizer, args, config, filepath):
 
 
 ## Currently only trains on sst dataset
-def train_multitask(args):
+def train_multitask(args, save_metrics):
     device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
     # Load data
     # Create the data and its corresponding datasets and dataloader
@@ -234,10 +235,15 @@ def train_multitask(args):
             save_model(model, optimizer, args, config, args.filepath)
 
         print(f"Epoch {epoch}: train loss :: {train_loss :.3f}, train acc :: {train_acc :.3f}, dev acc :: {dev_acc :.3f}")
+        save_metrics["train_loss"].append(train_loss)
+        save_metrics["train_acc"].append(train_acc)
+        save_metrics["dev_acc"].append(dev_acc)
+        save_metrics["train_f1"].append(train_f1)
+        save_metrics["dev_f1"].append(dev_f1)
 
 
 
-def test_model(args):
+def test_model(args, save_metrics):
     with torch.no_grad():
         device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
         saved = torch.load(args.filepath)
@@ -294,5 +300,22 @@ if __name__ == "__main__":
     args = get_args()
     args.filepath = f'{args.option}-{args.epochs}-{args.lr}-multitask.pt' # save path
     seed_everything(args.seed)  # fix the seed for reproducibility
-    train_multitask(args)
-    test_model(args)
+
+    save_metrics = {
+        "epoch": [],
+        "train_loss": [],
+        "train_acc": [],
+        "train_f1": [],
+        "dev_acc": [],
+        "dev_f1": [],
+        "test_acc": []
+    }
+
+    train_multitask(args, save_metrics)
+    test_model(args, save_metrics)
+
+    # Save save_metrics to a JSON file
+    with open('multitask_saved_metrics.json', 'w') as f:
+        json.dump(save_metrics, f, indent=4)
+
+    print('Metrics saved to multitask_saved_metrics.json')
