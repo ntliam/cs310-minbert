@@ -239,6 +239,7 @@ def train_multitask(args, save_metrics):
             save_model(model, optimizer, args, config, args.filepath)
 
         print(f"Epoch {epoch}: train loss :: {train_loss :.3f}, train acc :: {train_acc :.3f}, dev acc :: {dev_acc :.3f}")
+        save_metrics["epoch"].append(epoch)
         save_metrics["train_loss"].append(train_loss)
         save_metrics["train_acc"].append(train_acc)
         save_metrics["dev_acc"].append(dev_acc)
@@ -258,7 +259,7 @@ def test_model(args, save_metrics):
         model = model.to(device)
         print(f"Loaded model to test from {args.filepath}")
 
-        test_model_multitask(args, model, device)
+        test_model_multitask(args, model, device, save_metrics)
 
 
 def get_args():
@@ -306,13 +307,19 @@ if __name__ == "__main__":
     seed_everything(args.seed)  # fix the seed for reproducibility
 
     save_metrics = {
+        "batch_size": args.batch_size,
+        "lr": args.lr,
+        "hidden_dropout_prob": args.hidden_dropout_prob,
+        "option": args.option,
         "epoch": [],
         "train_loss": [],
         "train_acc": [],
         "train_f1": [],
         "dev_acc": [],
         "dev_f1": [],
-        "test_acc": []
+        "test_sentiment_accuracy": [], 
+        "test_paraphrase_accuracy": [],
+        "test_sts_corr": []
     }
 
     train_multitask(args, save_metrics)

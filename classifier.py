@@ -148,13 +148,13 @@ def load_data(filename, flag='train'):
     num_labels = {}
     data = []
     if flag == 'test':
-        with open(filename, 'r') as fp:
+        with open(filename, 'r', encoding='utf-8') as fp:
             for record in csv.DictReader(fp,delimiter = '\t'):
                 sent = record['sentence'].lower().strip()
                 sent_id = record['id'].lower().strip()
                 data.append((sent,sent_id))
     else:
-        with open(filename, 'r') as fp:
+        with open(filename, 'r', encoding='utf-8') as fp:
             for record in csv.DictReader(fp,delimiter = '\t'):
                 sent = record['sentence'].lower().strip()
                 sent_id = record['id'].lower().strip()
@@ -334,6 +334,7 @@ def test(args, save_metrics):
         test_pred, test_sents, test_sent_ids = model_test_eval(test_dataloader, model, device)
         print('DONE Test')
         save_metrics["test_acc"].append(dev_acc)
+        save_metrics["test_f1"].append(dev_f1)
         with open(args.dev_out, "w+") as f:
             print(f"dev acc :: {dev_acc :.3f}")
             f.write(f"id \t Predicted_Sentiment \n")
@@ -347,7 +348,7 @@ def test(args, save_metrics):
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=11711)
-    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--epochs", type=int, default=2)
     parser.add_argument("--option", type=str,
                         help='pretrain: the BERT parameters are frozen; finetune: BERT parameters are updated',
                         choices=('pretrain', 'finetune'), default="pretrain")
@@ -356,7 +357,7 @@ def get_args():
     parser.add_argument("--test_out", type=str, default="cfimdb-test-output.txt")
                                     
 
-    parser.add_argument("--batch_size", help='sst: 64, cfimdb: 8 can fit a 12GB GPU', type=int, default=8)
+    parser.add_argument("--batch_size", help='sst: 64, cfimdb: 8 can fit a 12GB GPU', type=int, default=1)
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.3)
     parser.add_argument("--lr", type=float, help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
                         default=1e-5)
@@ -367,7 +368,7 @@ def get_args():
 if __name__ == "__main__":
     args = get_args()
     seed_everything(args.seed)
-    #args.filepath = f'{args.option}-{args.epochs}-{args.lr}.pt'
+    args.filepath = f'{args.option}-{args.epochs}-{args.lr}.pt'
 
     print('Training Sentiment Classifier on SST...')
     config = SimpleNamespace(
@@ -386,13 +387,18 @@ if __name__ == "__main__":
     )
 
     sst_save_metrics = {
+        "batch_size": config.batch_size,
+        "lr": config.lr,
+        "hidden_dropout_prob": config.hidden_dropout_prob,
+        "option": config.option,
         "epoch": [],
         "train_loss": [],
         "train_acc": [],
         "train_f1": [],
         "dev_acc": [],
         "dev_f1": [],
-        "test_acc": []
+        "test_acc": [],
+        "test_f1": []
     }
 
     train(config, sst_save_metrics)
@@ -423,13 +429,18 @@ if __name__ == "__main__":
     )
 
     cfimdb_save_metrics = {
+        "batch_size": config.batch_size,
+        "lr": config.lr,
+        "hidden_dropout_prob": config.hidden_dropout_prob,
+        "option": config.option,
         "epoch": [],
         "train_loss": [],
         "train_acc": [],
         "train_f1": [],
         "dev_acc": [],
         "dev_f1": [],
-        "test_acc": []
+        "test_acc": [],
+        "test_f1": []
     }
 
     train(config, cfimdb_save_metrics)

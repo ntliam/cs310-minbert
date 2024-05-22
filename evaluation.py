@@ -226,7 +226,7 @@ def model_eval_test_multitask(sentiment_dataloader,
                 sts_y_pred, sts_sent_ids)
 
 
-def test_model_multitask(args, model, device):
+def test_model_multitask(args, model, device, save_metrics):
         sst_test_data, num_labels,para_test_data, sts_test_data = \
             load_multitask_data(args.sst_test,args.para_test, args.sts_test, split='test')
 
@@ -274,6 +274,7 @@ def test_model_multitask(args, model, device):
             f.write(f"id \t Predicted_Sentiment \n")
             for p, s in zip(dev_sst_sent_ids, dev_sst_y_pred):
                 f.write(f"{p} , {s} \n")
+        save_metrics["test_sentiment_accuracy"].append(dev_sentiment_accuracy)
 
         with open(args.sst_test_out, "w+") as f:
             f.write(f"id \t Predicted_Sentiment \n")
@@ -285,6 +286,7 @@ def test_model_multitask(args, model, device):
             f.write(f"id \t Predicted_Is_Paraphrase \n")
             for p, s in zip(dev_para_sent_ids, dev_para_y_pred):
                 f.write(f"{p} , {s} \n")
+        save_metrics["test_paraphrase_accuracy"].append(dev_paraphrase_accuracy)
 
         with open(args.para_test_out, "w+") as f:
             f.write(f"id \t Predicted_Is_Paraphrase \n")
@@ -296,6 +298,7 @@ def test_model_multitask(args, model, device):
             f.write(f"id \t Predicted_Similiary \n")
             for p, s in zip(dev_sts_sent_ids, dev_sts_y_pred):
                 f.write(f"{p} , {s} \n")
+        save_metrics["test_sts_corr"].append(dev_sts_corr)
 
         with open(args.sts_test_out, "w+") as f:
             f.write(f"id \t Predicted_Similiary \n")
