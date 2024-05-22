@@ -1,0 +1,9 @@
+# Python models
+*.pt
+
+# Python cache directories
+__pycache__/
+*.py[cod]
+
+# Python virtual environments
+.venv/
