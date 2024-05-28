@@ -93,69 +93,43 @@ def visualize_multitask(json_path):
     with open(json_path, 'r') as file:
         data = json.load(file)
 
-    epochs = data['epoch']
-    train_loss = data['train_loss']
-    train_acc = data['train_acc']
-    train_f1 = data['train_f1']
-    dev_acc = data['dev_acc']
-    dev_f1 = data['dev_f1']
+    epochs = data["epoch"]
+
+    # Training metrics
+    train_loss = data["train_loss"]
+    train_sentiment_acc = data["train_sentiment_acc"]
+    train_paraphrase_acc = data["train_paraphrase_acc"]
+    train_sts_corr = data["train_sts_corr"]
+
+    # Test metrics
     test_sentiment_accuracy = data["test_sentiment_accuracy"]
     test_paraphrase_accuracy = data["test_paraphrase_accuracy"]
     test_sts_corr = data["test_sts_corr"]
 
-    # Create the first figure with 4 subplots
-    fig1, axs1 = plt.subplots(2, 2, figsize=(14, 10))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
 
-    axs1[0, 0].plot(epochs, train_loss, label='Train Loss')
-    axs1[0, 0].set_title('Train Loss')
-    axs1[0, 0].set_xlabel('Epoch')
-    axs1[0, 0].set_ylabel('Loss')
-    axs1[0, 0].legend()
+    # First figure - Training metrics
+    ax1.plot(epochs, train_loss, label='Train Loss')
+    ax1.plot(epochs, train_sentiment_acc, label='Train Sentiment Accuracy')
+    ax1.plot(epochs, train_paraphrase_acc, label='Train Paraphrase Accuracy')
+    ax1.plot(epochs, train_sts_corr, label='Train STS Correlation')
+    ax1.set_title(f'Training Metrics for {name.upper()}')
+    ax1.set_xlabel('Epochs')
+    ax1.set_ylabel('Metrics')
+    ax1.legend()
+    ax1.grid(True)
 
-    axs1[0, 1].plot(epochs, train_acc, label='Train Accuracy', color='orange')
-    axs1[0, 1].set_title('Train Accuracy')
-    axs1[0, 1].set_xlabel('Epoch')
-    axs1[0, 1].set_ylabel('Accuracy')
-    axs1[0, 1].legend()
+    # Second figure - Test metrics
+    ax2.plot(epochs, test_sentiment_accuracy, label='Test Sentiment Accuracy')
+    ax2.plot(epochs, test_paraphrase_accuracy, label='Test Paraphrase Accuracy')
+    ax2.plot(epochs, test_sts_corr, label='Test STS Correlation')
+    ax2.set_title(f'Test Metrics for {name.upper()}')
+    ax2.set_xlabel('Epochs')
+    ax2.set_ylabel('Metrics')
+    ax2.legend()
+    ax2.grid(True)
 
-    axs1[1, 0].plot(epochs, dev_acc, label='Dev Accuracy', color='green')
-    axs1[1, 0].set_title('Dev Accuracy')
-    axs1[1, 0].set_xlabel('Epoch')
-    axs1[1, 0].set_ylabel('Accuracy')
-    axs1[1, 0].legend()
-
-    axs1[1, 1].plot(epochs, dev_f1, label='Dev F1 Score', color='red')
-    axs1[1, 1].set_title('Dev F1 Score')
-    axs1[1, 1].set_xlabel('Epoch')
-    axs1[1, 1].set_ylabel('F1 Score')
-    axs1[1, 1].legend()
-
-    fig1.suptitle(f'Multitask Training and Validation Metrics for {name.upper()}', fontsize=16)
     plt.tight_layout()
-    plt.subplots_adjust(top=0.9)
-
-    # Create the second figure with 3 subplots
-    fig2, axs2 = plt.subplots(1, 3, figsize=(21, 7))
-
-    axs2[0].plot(test_sentiment_accuracy, color='blue')
-    axs2[0].set_ylim(0, 1)
-    axs2[0].set_title('Test Sentiment Accuracy')
-    axs2[0].set_ylabel('Accuracy')
-
-    axs2[1].plot(test_paraphrase_accuracy, color='purple')
-    axs2[1].set_ylim(0, 1)
-    axs2[1].set_title('Test Paraphrase Accuracy')
-    axs2[1].set_ylabel('Accuracy')
-
-    axs2[2].plot(test_sts_corr, color='cyan')
-    axs2[2].set_ylim(0, 1)
-    axs2[2].set_title('Test STS Correlation')
-    axs2[2].set_ylabel('Correlation')
-
-    fig2.suptitle(f'Test Metrics for {name.upper()}', fontsize=16)
-    plt.tight_layout()
-    plt.subplots_adjust(top=0.85)
-
     plt.show()
 
 
