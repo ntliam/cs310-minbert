@@ -93,9 +93,10 @@ class MultitaskBERT(nn.Module):
         ### TODO
         # raise NotImplementedError
         outputs = self.bert(input_ids, attention_mask)
-        cls_output = outputs['last_hidden_state'][:, 0, :]
+        cls_output = outputs['pooler_output']
 
         return cls_output
+    
     def predict_sentiment(self, input_ids, attention_mask):
         '''Given a batch of sentences, outputs logits for classifying sentiment.
         There are 5 sentiment classes:
@@ -108,7 +109,7 @@ class MultitaskBERT(nn.Module):
         embeddings = self.forward(input_ids, attention_mask)
 
         # Pass the embeddings through the sentiment classifier
-        logits = self.sentiment_classifier(embeddings)
+        logits = self.sentiment_classifier(self.dropout(embeddings))
         return logits
 
 
@@ -277,7 +278,7 @@ def get_args():
     parser.add_argument("--sts_test", type=str, default="data/sts-test-student.csv")
 
     parser.add_argument("--seed", type=int, default=11711)
-    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--option", type=str,
                         help='pretrain: the BERT parameters are frozen; finetune: BERT parameters are updated',
                         choices=('pretrain', 'finetune'), default="pretrain")
@@ -297,11 +298,10 @@ def get_args():
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.3)
     parser.add_argument("--lr", type=float, help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
                         default=1e-5)
-
-    args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
     return args
 
-if __name__ == "__main__":
+def main():
     args = get_args()
     args.filepath = f'{args.option}-{args.epochs}-{args.lr}-multitask.pt' # save path
     seed_everything(args.seed)  # fix the seed for reproducibility
@@ -326,7 +326,10 @@ if __name__ == "__main__":
     test_model(args, save_metrics)
 
     # Save save_metrics to a JSON file
-    with open('multitask_saved_metrics.json', 'w') as f:
+    with open('stats/multitask_saved_metrics.json', 'w') as f:
         json.dump(save_metrics, f, indent=4)
 
     print('Metrics saved to multitask_saved_metrics.json')
+
+if __name__ == "__main__":
+    main()
