@@ -1,3 +1,4 @@
+import fnmatch
 from typing import Dict, List, Optional, Union, Tuple, BinaryIO
 import os
 import sys
@@ -52,7 +53,7 @@ def visualize_json(json_path):
     train_f1 = data['train_f1']
     dev_acc = data['dev_acc']
     dev_f1 = data['dev_f1']
-    test_acc = data['test_acc']
+    test_acc = data.get('test_acc')
 
     fig, axs = plt.subplots(2, 2, figsize=(10, 6))
 
