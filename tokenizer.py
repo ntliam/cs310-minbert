@@ -27,7 +27,7 @@ FULL_TOKENIZER_FILE = "tokenizer.json"
 VOCAB_FILES_NAMES = {"vocab_file": "vocab.txt"}
 PRETRAINED_VOCAB_FILES_MAP = {
     "vocab_file": {
-        "bert-base-uncased": "https://huggingface.co/bert-base-uncased/resolve/main/vocab.txt"
+        "bert-base-uncased": "https://hf-mirror.com/bert-base-uncased/resolve/main/vocab.txt"
     }
 }
 PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
@@ -866,6 +866,7 @@ class PreTrainedTokenizerBase(SpecialTokensMixin):
     resolved_vocab_files = {}
     unresolved_files = []
     for file_id, file_path in vocab_files.items():
+      print(file_path)
       if file_path is None:
         resolved_vocab_files[file_id] = None
       else:

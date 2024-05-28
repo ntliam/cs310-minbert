@@ -16,6 +16,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 import matplotlib.pyplot as plt
+import fnmatch
 
 __version__ = "4.0.0"
 _torch_version = importlib_metadata.version("torch")
@@ -34,7 +35,7 @@ PRESET_MIRROR_DICT = {
     "tuna": "https://mirrors.tuna.tsinghua.edu.cn/hugging-face-models",
     "bfsu": "https://mirrors.bfsu.edu.cn/hugging-face-models",
 }
-HUGGINGFACE_CO_PREFIX = "https://huggingface.co/{model_id}/resolve/{revision}/{filename}"
+HUGGINGFACE_CO_PREFIX = "https://hf-mirror.com/{model_id}/resolve/{revision}/{filename}"
 WEIGHTS_NAME = "pytorch_model.bin"
 CONFIG_NAME = "config.json"
 
