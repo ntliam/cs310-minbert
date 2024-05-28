@@ -221,61 +221,70 @@ def train_multitask(args, save_metrics):
         model.train()
         train_loss = 0
         num_batches = 0
+        
+        for dataloader in [sst_train_dataloader, para_train_dataloader, sts_train_dataloader]:
+            for batch in tqdm(dataloader, desc=f'train-{epoch}', disable=TQDM_DISABLE):
+                optimizer.zero_grad()
 
-        # Create a cycle iterator for each dataloader to ensure balanced training
-        sst_train_iter = cycle(sst_train_dataloader)
-        para_train_iter = cycle(para_train_dataloader)
-        sts_train_iter = cycle(sts_train_dataloader)
+                if dataloader == sst_train_dataloader:
+                    input_ids, attention_mask, labels = (
+                        batch['token_ids'].to(device),
+                        batch['attention_mask'].to(device), 
+                        batch['labels'].to(device)
+                    )
+                    logits = model.predict_sentiment(input_ids, attention_mask)
+                    loss = (F.cross_entropy(logits, labels.view(-1), reduction='sum') / args.batch_size) 
 
-        for _ in tqdm(range(max(len(sst_train_dataloader), len(para_train_dataloader), len(sts_train_dataloader))), desc=f'train-{epoch}', disable=TQDM_DISABLE):
-            # SST Task
-            batch = next(sst_train_iter)
-            b_ids, b_mask, b_labels = (batch['token_ids'], batch['attention_mask'], batch['labels'])
-            b_ids, b_mask, b_labels = b_ids.to(device), b_mask.to(device), b_labels.to(device)
-            optimizer.zero_grad()
-            logits = model.predict_sentiment(b_ids, b_mask)
-            loss = F.cross_entropy(logits, b_labels.view(-1), reduction='sum') / args.batch_size
-            loss.backward()
-            optimizer.step()
-            train_loss += loss.item()
-            num_batches += 1
+                elif dataloader == para_train_dataloader:
+                    input_ids_1, attention_mask_1, input_ids_2, attention_mask_2, labels = (
+                        batch['token_ids_1'].to(device),
+                        batch['attention_mask_1'].to(device),
+                        batch['token_ids_2'].to(device),
+                        batch['attention_mask_2'].to(device),
+                        batch['labels'].to(device),
+                    )
+                    logits = model.predict_paraphrase(input_ids_1, attention_mask_1, input_ids_2, attention_mask_2)
+                    loss = F.binary_cross_entropy_with_logits(logits.squeeze(), labels.float())
 
-            # Paraphrase Task
-            batch = next(para_train_iter)
-            b_ids1, b_mask1, b_ids2, b_mask2, b_labels = (batch['token_ids_1'], batch['attention_mask_1'], batch['token_ids_2'], batch['attention_mask_2'], batch['labels'])
-            b_ids1, b_mask1, b_ids2, b_mask2, b_labels = b_ids1.to(device), b_mask1.to(device), b_ids2.to(device), b_mask2.to(device), b_labels.to(device)
-            optimizer.zero_grad()
-            logits = model.predict_paraphrase(b_ids1, b_mask1, b_ids2, b_mask2)
-            loss = F.binary_cross_entropy_with_logits(logits.squeeze(), b_labels.float(), reduction='sum') / args.batch_size
-            loss.backward()
-            optimizer.step()
-            train_loss += loss.item()
-            num_batches += 1
+                elif dataloader == sts_train_dataloader:
+                    input_ids_1, attention_mask_1, input_ids_2, attention_mask_2, labels = (
+                        batch['token_ids_1'].to(device),
+                        batch['attention_mask_1'].to(device),
+                        batch['token_ids_2'].to(device),
+                        batch['attention_mask_2'].to(device),
+                        batch['labels'].to(device),
+                    )
+                    if args.option == 'pretrain':
+                        logits = model.predict_similarity(input_ids_1, attention_mask_1, input_ids_2, attention_mask_2)
+                        loss = F.mse_loss(logits.squeeze(), labels.float())
+                    else:
+                        labels_scaled = labels.float() / 5.0
+                        cos_sim = model.predict_similarity(input_ids_1, attention_mask_1, input_ids_2, attention_mask_2)
+                        loss = F.mse_loss(cos_sim.squeeze(), labels_scaled)
 
-            # STS Task
-            batch = next(sts_train_iter)
-            b_ids1, b_mask1, b_ids2, b_mask2, b_labels = (batch['token_ids_1'], batch['attention_mask_1'], batch['token_ids_2'], batch['attention_mask_2'], batch['labels'])
-            b_ids1, b_mask1, b_ids2, b_mask2, b_labels = b_ids1.to(device), b_mask1.to(device), b_ids2.to(device), b_mask2.to(device), b_labels.to(device)
-            optimizer.zero_grad()
-            logits = model.predict_similarity(b_ids1, b_mask1, b_ids2, b_mask2)
-            loss = F.mse_loss(logits.view(-1), b_labels.float().view(-1), reduction='sum') / args.batch_size
-            loss.backward()
-            optimizer.step()
-            train_loss += loss.item()
-            num_batches += 1
+                loss.backward()
+                optimizer.step()
+                train_loss += loss.item()
+                num_batches += 1
 
         train_loss = train_loss / num_batches
 
-        # Evaluate on the SST dataset
-        sentiment_accuracy, sst_y_pred, sst_sent_ids, paraphrase_accuracy, para_y_pred, para_sent_ids, sts_corr, sts_y_pred, sts_sent_ids = model_eval_multitask(sst_dev_dataloader, para_dev_dataloader, sts_dev_dataloader, model, device)
-    
-        avg_normalized_score = (sentiment_accuracy + paraphrase_accuracy + ((sts_corr + 1)/2)) / 3
+        sentiment_accuracy, sst_y_pred, sst_sent_ids,\
+              paraphrase_accuracy, para_y_pred, para_sent_ids, \
+                sts_corr, sts_y_pred, sts_sent_ids = model_eval_multitask(
+            sst_dev_dataloader, para_dev_dataloader, sts_dev_dataloader, model, device
+        )
+
+        avg_normalized_score = (sentiment_accuracy + paraphrase_accuracy + ((sts_corr + 1) / 2)) / 3
 
         if avg_normalized_score > best_avg_normalized_score:
             best_avg_normalized_score = avg_normalized_score
             save_model(model, optimizer, args, config, args.filepath)
 
-        print(f"Epoch {epoch}: train loss :: {train_loss :.3f}, sentiment acc :: {sentiment_accuracy :.3f}, paraphrase acc :: {paraphrase_accuracy :.3f}, sts corr :: {sts_corr}, avg acc :: {avg_normalized_score :.3f}")
+        print(f"Epoch {epoch}: train loss :: {train_loss:.3f}, "
+            f"sentiment acc :: {sentiment_accuracy:.3f}, paraphrase acc :: {paraphrase_accuracy:.3f}, sts corr :: {sts_corr:.3f}, "
+            f"avg acc :: {avg_normalized_score:.3f}")
+
         save_metrics["epoch"].append(epoch)
         save_metrics["train_loss"].append(train_loss)
         save_metrics["train_sentiment_acc"].append(sentiment_accuracy)
