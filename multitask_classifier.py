@@ -17,7 +17,7 @@ from datasets import SentenceClassificationDataset, SentencePairDataset, Sentenc
 from evaluation import model_eval_sst, test_model_multitask, model_eval_multitask
 
 
-TQDM_DISABLE=True
+TQDM_DISABLE=False
 
 # fix the random seed
 def seed_everything(seed=11711):
@@ -217,7 +217,7 @@ def train_multitask(args, save_metrics):
 
     print("========================Training========================")
     # Run for the specified number of epochs
-    for epoch in tqdm(range(args.epochs)):
+    for epoch in range(args.epochs):
         model.train()
         train_loss = 0
         num_batches = 0
