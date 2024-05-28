@@ -17,6 +17,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 import matplotlib.pyplot as plt
+import fnmatch
 
 __version__ = "4.0.0"
 _torch_version = importlib_metadata.version("torch")
@@ -35,7 +36,7 @@ PRESET_MIRROR_DICT = {
     "tuna": "https://mirrors.tuna.tsinghua.edu.cn/hugging-face-models",
     "bfsu": "https://mirrors.bfsu.edu.cn/hugging-face-models",
 }
-HUGGINGFACE_CO_PREFIX = "https://huggingface.co/{model_id}/resolve/{revision}/{filename}"
+HUGGINGFACE_CO_PREFIX = "https://hf-mirror.com/{model_id}/resolve/{revision}/{filename}"
 WEIGHTS_NAME = "pytorch_model.bin"
 CONFIG_NAME = "config.json"
 
@@ -87,6 +88,53 @@ def visualize_json(json_path):
     # Add a central title
     fig.suptitle(f'Training statistics for {name.upper()}', fontsize=16)
     plt.tight_layout()
+
+def visualize_multitask(json_path):
+    name = json_path.split('/')[-1].split('_')[0]
+
+    with open(json_path, 'r') as file:
+        data = json.load(file)
+
+    epochs = data["epoch"]
+
+    # Training metrics
+    train_loss = data["train_loss"]
+    train_sentiment_acc = data["train_sentiment_acc"]
+    train_paraphrase_acc = data["train_paraphrase_acc"]
+    train_sts_corr = data["train_sts_corr"]
+
+    # Test metrics
+    test_sentiment_accuracy = data["test_sentiment_accuracy"]
+    test_paraphrase_accuracy = data["test_paraphrase_accuracy"]
+    test_sts_corr = data["test_sts_corr"]
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+
+    # First figure - Training metrics
+    ax1.plot(epochs, train_loss, label='Train Loss')
+    ax1.plot(epochs, train_sentiment_acc, label='Train Sentiment Accuracy')
+    ax1.plot(epochs, train_paraphrase_acc, label='Train Paraphrase Accuracy')
+    ax1.plot(epochs, train_sts_corr, label='Train STS Correlation')
+    ax1.set_title(f'Training Metrics for {name.upper()}')
+    ax1.set_xlabel('Epochs')
+    ax1.set_ylabel('Metrics')
+    ax1.legend()
+    ax1.grid(True)
+
+    # Second figure - Test metrics
+    ax2.plot(epochs, test_sentiment_accuracy, label='Test Sentiment Accuracy')
+    ax2.plot(epochs, test_paraphrase_accuracy, label='Test Paraphrase Accuracy')
+    ax2.plot(epochs, test_sts_corr, label='Test STS Correlation')
+    ax2.set_title(f'Test Metrics for {name.upper()}')
+    ax2.set_xlabel('Epochs')
+    ax2.set_ylabel('Metrics')
+    ax2.legend()
+    ax2.grid(True)
+
+    plt.tight_layout()
+    plt.show()
+
+
 
 
 def is_torch_available():
