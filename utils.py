@@ -89,6 +89,7 @@ def visualize_json(json_path):
     fig.suptitle(f'Training statistics for {name.upper()}', fontsize=16)
     plt.tight_layout()
 
+
 def visualize_multitask(json_path):
     name = json_path.split('/')[-1].split('_')[0]
 
@@ -102,6 +103,7 @@ def visualize_multitask(json_path):
     train_sentiment_acc = data["train_sentiment_acc"]
     train_paraphrase_acc = data["train_paraphrase_acc"]
     train_sts_corr = data["train_sts_corr"]
+    train_avg = data["train_avg_normalized_score"]
 
     # Test metrics
     test_sentiment_accuracy = data["test_sentiment_accuracy"]
@@ -110,31 +112,33 @@ def visualize_multitask(json_path):
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
 
-    # First figure - Training metrics
-    ax1.plot(epochs, train_loss, label='Train Loss')
-    ax1.plot(epochs, train_sentiment_acc, label='Train Sentiment Accuracy')
-    ax1.plot(epochs, train_paraphrase_acc, label='Train Paraphrase Accuracy')
-    ax1.plot(epochs, train_sts_corr, label='Train STS Correlation')
+    # First figure - Dev metrics
+    # ax1.plot(epochs, train_loss, label='Train Loss')
+    ax1.plot(epochs, train_sentiment_acc, label='Dev Sentiment Accuracy')
+    ax1.plot(epochs, train_paraphrase_acc, label='Dev Paraphrase Accuracy')
+    ax1.plot(epochs, train_sts_corr, label='Dev STS Correlation')
+    # ax1.plot(epochs, train_avg, label='Dev Avg Score')
     ax1.set_title(f'Training Metrics for {name.upper()}')
     ax1.set_xlabel('Epochs')
     ax1.set_ylabel('Metrics')
     ax1.legend()
     ax1.grid(True)
 
-    # Second figure - Test metrics
-    ax2.plot(epochs, test_sentiment_accuracy, label='Test Sentiment Accuracy')
-    ax2.plot(epochs, test_paraphrase_accuracy, label='Test Paraphrase Accuracy')
-    ax2.plot(epochs, test_sts_corr, label='Test STS Correlation')
-    ax2.set_title(f'Test Metrics for {name.upper()}')
+    # Second figure - Training Loss
+    ax2.plot(epochs, train_loss, label='Training Loss')
+    # ax2.plot(epochs, test_paraphrase_accuracy,
+    #          label='Test Paraphrase Accuracy')
+    # ax2.plot(epochs, test_sts_corr, label='Test STS Correlation')
+    ax2.set_title(f'Training loss for {name.upper()}')
     ax2.set_xlabel('Epochs')
-    ax2.set_ylabel('Metrics')
+    ax2.set_ylabel('Loss')
     ax2.legend()
     ax2.grid(True)
 
     plt.tight_layout()
     plt.show()
 
-
+    return test_sentiment_accuracy, test_paraphrase_accuracy, test_sts_corr
 
 
 def is_torch_available():
