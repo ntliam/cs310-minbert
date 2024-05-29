@@ -173,7 +173,12 @@ def save_model(model, optimizer, args, config, filepath):
     print(f"save the model to {filepath}")
 
 
-def train_multitask(args, save_metrics):
+def train_multitask(args, save_metrics, model_name='baseline'):
+
+    model_dict = {
+        'baseline': MultitaskBERT
+    }
+
     device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
     # Load data
     print("========================Loading data========================")
@@ -217,7 +222,15 @@ def train_multitask(args, save_metrics):
 
     config = SimpleNamespace(**config)
 
-    model = MultitaskBERT(config)
+    model = model_dict[model_name](config)
+
+    total_params = sum(p.numel()
+                       for p in model.parameters() if p.requires_grad)
+
+    with open(model_name + '.txt', 'w') as f:
+        f.write(f"Total Trainable Parameters: {total_params}\n\n")
+        f.write(str(model.parameters))
+
     model = model.to(device)
     print("========================Model Created========================")
 
