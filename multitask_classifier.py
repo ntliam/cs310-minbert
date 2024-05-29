@@ -158,6 +158,21 @@ class MultitaskBERT(nn.Module):
         return logits
 
 
+class MultitaskBERT_LoRA(MultitaskBERT):
+    '''
+    This module should use BERT for 3 tasks:
+
+    - Sentiment classification (predict_sentiment)
+    - Paraphrase detection (predict_paraphrase)
+    - Semantic Textual Similarity (predict_similarity)
+    '''
+
+    def __init__(self, config):
+        super(MultitaskBERT_LoRA, self).__init__(config)
+        # You will want to add layers here to perform the downstream tasks.
+        # Pretrain mode does not require updating bert paramters.
+
+
 def save_model(model, optimizer, args, config, filepath):
     save_info = {
         'model': model.state_dict(),
@@ -176,7 +191,8 @@ def save_model(model, optimizer, args, config, filepath):
 def train_multitask(args, save_metrics, model_name='baseline'):
 
     model_dict = {
-        'baseline': MultitaskBERT
+        'baseline': MultitaskBERT,
+        'LoRA': MultitaskBERT_LoRA
     }
 
     device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
