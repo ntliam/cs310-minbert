@@ -338,6 +338,22 @@ class MultitaskBERT_LoRA(MultitaskBERT):
 
 ########### End of LoRA ###############
 
+########### LoRA + RoFormer #############
+
+class MultitaskBERT_LoRA_RoFormer(MultitaskBERT_LoRA):
+    '''
+    This module should use BERT for 3 tasks:
+
+    - Sentiment classification (predict_sentiment)
+    - Paraphrase detection (predict_paraphrase)
+    - Semantic Textual Similarity (predict_similarity)
+    '''
+
+    def __init__(self, config):
+        super(MultitaskBERT_LoRA_RoFormer, self).__init__(config)
+
+########### End of LoRA + RoFormer ###############
+
 
 def save_model(model, optimizer, args, config, filepath):
     save_info = {
@@ -358,7 +374,8 @@ def train_multitask(args, save_metrics, model_name='baseline'):
 
     model_dict = {
         'baseline': MultitaskBERT,
-        'LoRA': MultitaskBERT_LoRA
+        'LoRA': MultitaskBERT_LoRA,
+        'RoFormer': MultitaskBERT_LoRA_RoFormer
     }
 
     device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
