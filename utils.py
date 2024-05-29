@@ -114,25 +114,27 @@ def visualize_multitask(json_path):
 
     # First figure - Dev metrics
     # ax1.plot(epochs, train_loss, label='Train Loss')
-    ax1.plot(epochs, train_sentiment_acc, label='Dev Sentiment Accuracy')
-    ax1.plot(epochs, train_paraphrase_acc, label='Dev Paraphrase Accuracy')
-    ax1.plot(epochs, train_sts_corr, label='Dev STS Correlation')
+    ax1.plot(epochs, train_sentiment_acc,
+             label='Dev Sentiment Accuracy', linewidth=2)
+    ax1.plot(epochs, train_paraphrase_acc,
+             label='Dev Paraphrase Accuracy', linewidth=2)
+    ax1.plot(epochs, train_sts_corr, label='Dev STS Correlation', linewidth=2)
     # ax1.plot(epochs, train_avg, label='Dev Avg Score')
-    ax1.set_title(f'Training Metrics for {name.upper()}')
-    ax1.set_xlabel('Epochs')
-    ax1.set_ylabel('Metrics')
-    ax1.legend()
+    ax1.set_title(f'Training Metrics for {name.upper()}', fontsize=14)
+    ax1.set_xlabel('Epochs', fontsize=12)
+    ax1.set_ylabel('Metrics', fontsize=12)
+    ax1.legend(fontsize=14)
     ax1.grid(True)
 
     # Second figure - Training Loss
-    ax2.plot(epochs, train_loss, label='Training Loss')
+    ax2.plot(epochs, train_loss, label='Training Loss', linewidth=2)
     # ax2.plot(epochs, test_paraphrase_accuracy,
     #          label='Test Paraphrase Accuracy')
     # ax2.plot(epochs, test_sts_corr, label='Test STS Correlation')
-    ax2.set_title(f'Training loss for {name.upper()}')
-    ax2.set_xlabel('Epochs')
-    ax2.set_ylabel('Loss')
-    ax2.legend()
+    ax2.set_title(f'Training loss for {name.upper()}', fontsize=14)
+    ax2.set_xlabel('Epochs', fontsize=12)
+    ax2.set_ylabel('Loss', fontsize=12)
+    ax2.legend(fontsize=14)
     ax2.grid(True)
 
     plt.tight_layout()
