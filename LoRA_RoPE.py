@@ -68,7 +68,7 @@ save_metrics = {
 }
 
 train_multitask(args, save_metrics, model_name='RoPE')
-test_model(args, save_metrics)
+test_model(args, save_metrics, model_name = 'RoPE')
 
 MULTITASK_RoPE = "./stats/multitask-LoRA-RoPE_saved_metrics.json"
 
