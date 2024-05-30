@@ -383,7 +383,8 @@ def train_multitask(args, save_metrics, model_name='LoRA'):
 
     model_dict = {
         'baseline': MultitaskBERT,
-        'LoRA': MultitaskBERT_LoRA
+        'LoRA': MultitaskBERT_LoRA,
+        'RoPE': MutitaskBERT_LoRA_RoPE
     }
 
     device = torch.device('cuda') if args.use_gpu else torch.device('cpu')

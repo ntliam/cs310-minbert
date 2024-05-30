@@ -174,13 +174,13 @@ class BertPreTrainedModel(nn.Module):
         if metadata is not None:
             state_dict._metadata = metadata
 
-        your_bert_params = [f"bert.{x[0]}" for x in model.named_parameters()]
-        for k in state_dict:
-            if k not in your_bert_params and not k.startswith("cls."):
-                possible_rename = [x for x in k.split(
-                    ".")[1:-1] if x in m.values()]
-                raise ValueError(
-                    f"{k} cannot be reload to your model, one/some of {possible_rename} we provided have been renamed")
+        # your_bert_params = [f"bert.{x[0]}" for x in model.named_parameters()]
+        # for k in state_dict:
+        #     if k not in your_bert_params and not k.startswith("cls."):
+        #         possible_rename = [x for x in k.split(
+        #             ".")[1:-1] if x in m.values()]
+        #         raise ValueError(
+        #             f"{k} cannot be reload to your model, one/some of {possible_rename} we provided have been renamed")
 
         # PyTorch's `_load_from_state_dict` does not copy parameters in a module's descendants
         # so we need to apply the function recursively.

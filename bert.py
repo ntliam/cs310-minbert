@@ -216,7 +216,8 @@ class BertModel(BertPreTrainedModel):
         pos_embeds = None
         # TODO
         # raise NotImplementedError
-        pos_embeds = self.pos_embedding(pos_ids)
+        pos_embeds = self.pos_embedding(pos_ids)[:, :inputs_embeds.size(1), :]
+        pos_embeds = pos_embeds.expand_as(inputs_embeds)
 
         # Get token type ids, since we are not consider token type, just a placeholder.
         tk_type_ids = torch.zeros(
@@ -226,6 +227,7 @@ class BertModel(BertPreTrainedModel):
         # Add three embeddings together; then apply embed_layer_norm and dropout and return.
         # TODO
         # raise NotImplementedError
+
         embeds = inputs_embeds + pos_embeds + tk_type_embeds
         embeds = self.embed_layer_norm(embeds)
         embeds = self.embed_dropout(embeds)
@@ -278,7 +280,7 @@ class PositionalEncoding(nn.Module):
         super(PositionalEncoding, self).__init__()
 
         pe = torch.zeros(max_len, d_model)  # (max_len, d_model)
-        pe.requires_grad = False
+        # pe.requires_grad = False
         position = torch.arange(0, max_len).unsqueeze(1)
 
         div_term = torch.exp(torch.arange(0, d_model, 2)
@@ -289,17 +291,20 @@ class PositionalEncoding(nn.Module):
         self.max_len = max_len
         self.d_model = d_model
         self.pe = pe.unsqueeze(0)  # (1, max_len, d_model)
+
         # self.register_buffer('pe', pe)
 
     def forward(self, x):
         # x: (batch, max_len)
         batch = x.size(0)
 
+        result = self.pe.repeat(batch, 1, 1).to(x.device)
+
         # x = x + self.pe[:, :x.size(1)]
         # self.pe[:, :x.size(1)]
         # print(f"first: {self.pe.shape}")
         # print(f"third: {self.pe.repeat(batch, 1, 1).shape}")
-        return self.pe.repeat(batch, 1, 1)  # (batch, max_len, d_model)
+        return result  # (batch, max_len, d_model)
 
 
 class RoBertModel(BertModel):
@@ -315,9 +320,10 @@ class RoBertModel(BertModel):
         super(RoBertModel, self).__init__(config)
         self.config = config
 
-        self.pos_embedding = nn.Embedding(
-            config.max_position_embeddings, config.hidden_size)
+        # self.pos_embedding = nn.Embedding(
+        #     config.max_position_embeddings, config.hidden_size)
 
-        self.init_weights()
+        self.pos_embedding = PositionalEncoding(
+            config.max_position_embeddings, config.hidden_size)
 
 #### End of RoPE ####
