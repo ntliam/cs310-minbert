@@ -1,0 +1,62 @@
+Total Trainable Parameters: 2077447
+
+<bound method Module.parameters of MutitaskBERT_LoRA_RoPE(
+  (bert): RoBertModel(
+    (word_embedding): Embedding(30522, 768, padding_idx=0)
+    (pos_embedding): Embedding(512, 768)
+    (tk_type_embedding): Embedding(2, 768)
+    (embed_layer_norm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+    (embed_dropout): Dropout(p=0.0, inplace=False)
+    (bert_layers): ModuleList(
+      (0-11): 12 x RoBertLayer(
+        (self_attention): RoBertSelfAttention(
+          (query): LinearLoRA(
+            (lora_dropout): Dropout(p=0.1, inplace=False)
+            (pretrained): Linear(in_features=768, out_features=768, bias=True)
+            (lora_A): Linear(in_features=768, out_features=8, bias=False)
+            (lora_B): Linear(in_features=8, out_features=768, bias=False)
+          )
+          (key): Linear(in_features=768, out_features=768, bias=True)
+          (value): LinearLoRA(
+            (lora_dropout): Dropout(p=0.1, inplace=False)
+            (pretrained): Linear(in_features=768, out_features=768, bias=True)
+            (lora_A): Linear(in_features=768, out_features=8, bias=False)
+            (lora_B): Linear(in_features=8, out_features=768, bias=False)
+          )
+          (dropout): Dropout(p=0.0, inplace=False)
+        )
+        (attention_dense): Linear(in_features=768, out_features=768, bias=True)
+        (attention_layer_norm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+        (attention_dropout): Dropout(p=0.0, inplace=False)
+        (interm_dense): Linear(in_features=768, out_features=3072, bias=True)
+        (out_dense): Linear(in_features=3072, out_features=768, bias=True)
+        (out_layer_norm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+        (out_dropout): Dropout(p=0.0, inplace=False)
+      )
+    )
+    (pooler_dense): Linear(in_features=768, out_features=768, bias=True)
+    (pooler_af): Tanh()
+  )
+  (sentiment_classifier): Sequential(
+    (0): Linear(in_features=768, out_features=768, bias=True)
+    (1): BatchNorm1d(768, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (2): GELU(approximate='none')
+    (3): Dropout(p=0.0, inplace=False)
+    (4): Linear(in_features=768, out_features=5, bias=True)
+  )
+  (paraphrase_classifier): Sequential(
+    (0): Linear(in_features=1536, out_features=768, bias=True)
+    (1): BatchNorm1d(768, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (2): GELU(approximate='none')
+    (3): Dropout(p=0.0, inplace=False)
+    (4): Linear(in_features=768, out_features=1, bias=True)
+  )
+  (similarity_classifier): Sequential(
+    (0): Linear(in_features=1, out_features=768, bias=True)
+    (1): BatchNorm1d(768, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (2): GELU(approximate='none')
+    (3): Dropout(p=0.0, inplace=False)
+    (4): Linear(in_features=768, out_features=1, bias=True)
+  )
+  (dropout): Dropout(p=0.0, inplace=False)
+)>

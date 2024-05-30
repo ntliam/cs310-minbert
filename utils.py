@@ -89,6 +89,7 @@ def visualize_json(json_path):
     fig.suptitle(f'Training statistics for {name.upper()}', fontsize=16)
     plt.tight_layout()
 
+
 def visualize_multitask(json_path):
     name = json_path.split('/')[-1].split('_')[0]
 
@@ -102,42 +103,44 @@ def visualize_multitask(json_path):
     train_sentiment_acc = data["train_sentiment_acc"]
     train_paraphrase_acc = data["train_paraphrase_acc"]
     train_sts_corr = data["train_sts_corr"]
+    train_avg = data["train_avg_normalized_score"]
 
     # Test metrics
     test_sentiment_accuracy = data["test_sentiment_accuracy"]
     test_paraphrase_accuracy = data["test_paraphrase_accuracy"]
     test_sts_corr = data["test_sts_corr"]
 
-    fig, axs = plt.subplots(2, 2, figsize=(14, 10))
-    
-    # Plotting each metric in a separate subplot
-    axs[0, 0].plot(epochs, train_loss, label='Train Loss', color='r')
-    axs[0, 0].set_title('Train Loss')
-    axs[0, 0].set_xlabel('Epochs')
-    axs[0, 0].set_ylabel('Loss')
-    axs[0, 0].grid(True)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
 
-    axs[0, 1].plot(epochs, train_sentiment_acc, label='Train Sentiment Accuracy', color='g')
-    axs[0, 1].set_title('Train Sentiment Accuracy')
-    axs[0, 1].set_xlabel('Epochs')
-    axs[0, 1].set_ylabel('Accuracy')
-    axs[0, 1].grid(True)
+    # First figure - Dev metrics
+    # ax1.plot(epochs, train_loss, label='Train Loss')
+    ax1.plot(epochs, train_sentiment_acc,
+             label='Dev Sentiment Accuracy', linewidth=2)
+    ax1.plot(epochs, train_paraphrase_acc,
+             label='Dev Paraphrase Accuracy', linewidth=2)
+    ax1.plot(epochs, train_sts_corr, label='Dev STS Correlation', linewidth=2)
+    # ax1.plot(epochs, train_avg, label='Dev Avg Score')
+    ax1.set_title(f'Training Metrics for {name.upper()}', fontsize=14)
+    ax1.set_xlabel('Epochs', fontsize=12)
+    ax1.set_ylabel('Metrics', fontsize=12)
+    ax1.legend(fontsize=14)
+    ax1.grid(True)
 
-    axs[1, 0].plot(epochs, train_paraphrase_acc, label='Train Paraphrase Accuracy', color='b')
-    axs[1, 0].set_title('Train Paraphrase Accuracy')
-    axs[1, 0].set_xlabel('Epochs')
-    axs[1, 0].set_ylabel('Accuracy')
-    axs[1, 0].grid(True)
+    # Second figure - Training Loss
+    ax2.plot(epochs, train_loss, label='Training Loss', linewidth=2)
+    # ax2.plot(epochs, test_paraphrase_accuracy,
+    #          label='Test Paraphrase Accuracy')
+    # ax2.plot(epochs, test_sts_corr, label='Test STS Correlation')
+    ax2.set_title(f'Training loss for {name.upper()}', fontsize=14)
+    ax2.set_xlabel('Epochs', fontsize=12)
+    ax2.set_ylabel('Loss', fontsize=12)
+    ax2.legend(fontsize=14)
+    ax2.grid(True)
 
-    axs[1, 1].plot(epochs, train_sts_corr, label='Train STS Correlation', color='c')
-    axs[1, 1].set_title('Train STS Correlation')
-    axs[1, 1].set_xlabel('Epochs')
-    axs[1, 1].set_ylabel('Correlation')
-    axs[1, 1].grid(True)
-
-    plt.suptitle(f'Training Metrics for {name.upper()} - Baseline Model', fontsize=16)
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.tight_layout()
     plt.show()
+
+    return test_sentiment_accuracy, test_paraphrase_accuracy, test_sts_corr
 
 
 def is_torch_available():
