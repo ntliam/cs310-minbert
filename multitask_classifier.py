@@ -7,7 +7,7 @@ from torch import nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from itertools import cycle
-from bert import BertModel
+from bert import BertModel, SwiGLU
 from optimizer import AdamW
 from tqdm import tqdm
 
@@ -15,7 +15,6 @@ from datasets import SentenceClassificationDataset, SentencePairDataset, Sentenc
     load_multitask_data, load_multitask_test_data
 
 from evaluation import model_eval_sst, test_model_multitask, model_eval_multitask
-
 
 TQDM_DISABLE=False
 
@@ -33,7 +32,7 @@ def seed_everything(seed=11711):
 BERT_HIDDEN_SIZE = 768
 N_SENTIMENT_CLASSES = 5
 
-
+    
 class MultitaskBERT(nn.Module):
     '''
     This module should use BERT for 3 tasks:
@@ -78,6 +77,7 @@ class MultitaskBERT(nn.Module):
             nn.Dropout(config.hidden_dropout_prob),
             nn.Linear(BERT_HIDDEN_SIZE, 1)
         )
+
 
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
@@ -127,8 +127,12 @@ class MultitaskBERT(nn.Module):
         cls_embedding_1 = self.forward(input_ids_1, attention_mask_1)
         cls_embedding_2 = self.forward(input_ids_2, attention_mask_2)
 
+        out1 = self.dropout(cls_embedding_1)
+        out2 = self.dropout(cls_embedding_2)
+        
+
         # Concatenate the embeddings
-        embeddings = torch.cat((cls_embedding_1, cls_embedding_2), dim=1)
+        embeddings = torch.cat((out1, out2), dim=1)
 
         # Pass the concatenated embeddings through the paraphrase classifier
         logits = self.paraphrase_classifier(embeddings)
@@ -181,20 +185,26 @@ def train_multitask(args, save_metrics):
     sst_train_data = SentenceClassificationDataset(sst_train_data, args)
     sst_dev_data = SentenceClassificationDataset(sst_dev_data, args)
 
-    sst_train_dataloader = DataLoader(sst_train_data, shuffle=True, batch_size=args.batch_size, collate_fn=sst_train_data.collate_fn)
-    sst_dev_dataloader = DataLoader(sst_dev_data, shuffle=False, batch_size=args.batch_size, collate_fn=sst_dev_data.collate_fn)
+    sst_train_dataloader = DataLoader(sst_train_data, shuffle=True, batch_size=args.batch_size, 
+                                      collate_fn=sst_train_data.collate_fn)
+    sst_dev_dataloader = DataLoader(sst_dev_data, shuffle=False, batch_size=args.batch_size, 
+                                    collate_fn=sst_dev_data.collate_fn)
     
     para_train_data = SentencePairDataset(para_train_data, args)
     para_dev_data = SentencePairDataset(para_dev_data, args)
 
-    para_train_dataloader = DataLoader(para_train_data, shuffle=True, batch_size=args.batch_size, collate_fn=para_train_data.collate_fn)
-    para_dev_dataloader = DataLoader(para_dev_data, shuffle=False, batch_size=args.batch_size, collate_fn=para_dev_data.collate_fn)
+    para_train_dataloader = DataLoader(para_train_data, shuffle=True, batch_size=args.batch_size,
+                                      collate_fn=para_train_data.collate_fn, num_workers=4)
+    para_dev_dataloader = DataLoader(para_dev_data, shuffle=False, batch_size=args.batch_size,
+                                    collate_fn=para_dev_data.collate_fn, num_workers=4)
     
     sts_train_data = SentencePairDataset(sts_train_data, args)
     sts_dev_data = SentencePairDataset(sts_dev_data, args)
 
-    sts_train_dataloader = DataLoader(sts_train_data, shuffle=True, batch_size=args.batch_size, collate_fn=sts_train_data.collate_fn)
-    sts_dev_dataloader = DataLoader(sts_dev_data, shuffle=False, batch_size=args.batch_size, collate_fn=sts_dev_data.collate_fn)
+    sts_train_dataloader = DataLoader(sts_train_data, shuffle=True, batch_size=args.batch_size, 
+                                      collate_fn=sts_train_data.collate_fn)
+    sts_dev_dataloader = DataLoader(sts_dev_data, shuffle=False, batch_size=args.batch_size, 
+                                    collate_fn=sts_dev_data.collate_fn)
 
     print("========================Data loaded========================")
 
@@ -216,61 +226,68 @@ def train_multitask(args, save_metrics):
     best_avg_normalized_score = 0
 
     print("========================Training========================")
-    # Run for the specified number of epochs
+    # Mixed precision training
+    scaler = torch.cuda.amp.GradScaler()
+
+    # Training loop with mixed precision
     for epoch in range(args.epochs):
         model.train()
         train_loss = 0
         num_batches = 0
-        
+
         for dataloader in [sst_train_dataloader, para_train_dataloader, sts_train_dataloader]:
             for batch in tqdm(dataloader, desc=f'train-{epoch}', disable=TQDM_DISABLE):
                 optimizer.zero_grad()
 
-                if dataloader == sst_train_dataloader:
-                    input_ids, attention_mask, labels = (
-                        batch['token_ids'].to(device),
-                        batch['attention_mask'].to(device), 
-                        batch['labels'].to(device)
-                    )
-                    logits = model.predict_sentiment(input_ids, attention_mask)
-                    loss = (F.cross_entropy(logits, labels.view(-1), reduction='sum') / args.batch_size) 
+                with torch.cuda.amp.autocast():
+                    if dataloader == sst_train_dataloader:
+                        input_ids, attention_mask, labels = (
+                            batch['token_ids'].to(device),
+                            batch['attention_mask'].to(device), 
+                            batch['labels'].to(device)
+                        )
+                        logits = model.predict_sentiment(input_ids, attention_mask)
+                        loss = (F.cross_entropy(logits, labels.view(-1), reduction='sum') / args.batch_size)
 
-                elif dataloader == para_train_dataloader:
-                    input_ids_1, attention_mask_1, input_ids_2, attention_mask_2, labels = (
-                        batch['token_ids_1'].to(device),
-                        batch['attention_mask_1'].to(device),
-                        batch['token_ids_2'].to(device),
-                        batch['attention_mask_2'].to(device),
-                        batch['labels'].to(device),
-                    )
-                    logits = model.predict_paraphrase(input_ids_1, attention_mask_1, input_ids_2, attention_mask_2)
-                    loss = F.binary_cross_entropy_with_logits(logits.squeeze(), labels.float())
+                    elif dataloader == para_train_dataloader:
+                        input_ids_1, attention_mask_1, input_ids_2, attention_mask_2, labels = (
+                            batch['token_ids_1'].to(device),
+                            batch['attention_mask_1'].to(device),
+                            batch['token_ids_2'].to(device),
+                            batch['attention_mask_2'].to(device),
+                            batch['labels'].to(device),
+                        )
+                        logits = model.predict_paraphrase(input_ids_1, attention_mask_1, input_ids_2, attention_mask_2)
+                        logits = torch.sigmoid(logits)  # sigmoid
+                        loss = F.binary_cross_entropy_with_logits(logits.squeeze(), labels.float())
 
-                elif dataloader == sts_train_dataloader:
-                    input_ids_1, attention_mask_1, input_ids_2, attention_mask_2, labels = (
-                        batch['token_ids_1'].to(device),
-                        batch['attention_mask_1'].to(device),
-                        batch['token_ids_2'].to(device),
-                        batch['attention_mask_2'].to(device),
-                        batch['labels'].to(device),
-                    )
-                    if args.option == 'pretrain':
-                        logits = model.predict_similarity(input_ids_1, attention_mask_1, input_ids_2, attention_mask_2)
-                        loss = F.mse_loss(logits.squeeze(), labels.float())
-                    else:
-                        labels_scaled = labels.float() / 5.0
-                        cos_sim = model.predict_similarity(input_ids_1, attention_mask_1, input_ids_2, attention_mask_2)
-                        loss = F.mse_loss(cos_sim.squeeze(), labels_scaled)
+                    elif dataloader == sts_train_dataloader:
+                        input_ids_1, attention_mask_1, input_ids_2, attention_mask_2, labels = (
+                            batch['token_ids_1'].to(device),
+                            batch['attention_mask_1'].to(device),
+                            batch['token_ids_2'].to(device),
+                            batch['attention_mask_2'].to(device),
+                            batch['labels'].to(device),
+                        )
+                        if args.option == 'pretrain':
+                            logits = model.predict_similarity(input_ids_1, attention_mask_1, input_ids_2, attention_mask_2)
+                            loss = F.mse_loss(logits.squeeze(), labels.float())
+                        else:
+                            labels_scaled = labels.float() / 5.0
+                            cos_sim = model.predict_similarity(input_ids_1, attention_mask_1, input_ids_2, attention_mask_2)
+                            loss = F.mse_loss(cos_sim.squeeze(), labels_scaled)
 
-                loss.backward()
-                optimizer.step()
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+
                 train_loss += loss.item()
                 num_batches += 1
 
         train_loss = train_loss / num_batches
 
         sentiment_accuracy, sst_y_pred, sst_sent_ids,\
-              paraphrase_accuracy, para_y_pred, para_sent_ids, \
+            paraphrase_accuracy, para_y_pred, para_sent_ids, \
                 sts_corr, sts_y_pred, sts_sent_ids = model_eval_multitask(
             sst_dev_dataloader, para_dev_dataloader, sts_dev_dataloader, model, device
         )

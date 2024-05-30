@@ -108,33 +108,36 @@ def visualize_multitask(json_path):
     test_paraphrase_accuracy = data["test_paraphrase_accuracy"]
     test_sts_corr = data["test_sts_corr"]
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+    fig, axs = plt.subplots(2, 2, figsize=(14, 10))
+    
+    # Plotting each metric in a separate subplot
+    axs[0, 0].plot(epochs, train_loss, label='Train Loss', color='r')
+    axs[0, 0].set_title('Train Loss')
+    axs[0, 0].set_xlabel('Epochs')
+    axs[0, 0].set_ylabel('Loss')
+    axs[0, 0].grid(True)
 
-    # First figure - Training metrics
-    ax1.plot(epochs, train_loss, label='Train Loss')
-    ax1.plot(epochs, train_sentiment_acc, label='Train Sentiment Accuracy')
-    ax1.plot(epochs, train_paraphrase_acc, label='Train Paraphrase Accuracy')
-    ax1.plot(epochs, train_sts_corr, label='Train STS Correlation')
-    ax1.set_title(f'Training Metrics for {name.upper()}')
-    ax1.set_xlabel('Epochs')
-    ax1.set_ylabel('Metrics')
-    ax1.legend()
-    ax1.grid(True)
+    axs[0, 1].plot(epochs, train_sentiment_acc, label='Train Sentiment Accuracy', color='g')
+    axs[0, 1].set_title('Train Sentiment Accuracy')
+    axs[0, 1].set_xlabel('Epochs')
+    axs[0, 1].set_ylabel('Accuracy')
+    axs[0, 1].grid(True)
 
-    # Second figure - Test metrics
-    ax2.plot(epochs, test_sentiment_accuracy, label='Test Sentiment Accuracy')
-    ax2.plot(epochs, test_paraphrase_accuracy, label='Test Paraphrase Accuracy')
-    ax2.plot(epochs, test_sts_corr, label='Test STS Correlation')
-    ax2.set_title(f'Test Metrics for {name.upper()}')
-    ax2.set_xlabel('Epochs')
-    ax2.set_ylabel('Metrics')
-    ax2.legend()
-    ax2.grid(True)
+    axs[1, 0].plot(epochs, train_paraphrase_acc, label='Train Paraphrase Accuracy', color='b')
+    axs[1, 0].set_title('Train Paraphrase Accuracy')
+    axs[1, 0].set_xlabel('Epochs')
+    axs[1, 0].set_ylabel('Accuracy')
+    axs[1, 0].grid(True)
 
-    plt.tight_layout()
+    axs[1, 1].plot(epochs, train_sts_corr, label='Train STS Correlation', color='c')
+    axs[1, 1].set_title('Train STS Correlation')
+    axs[1, 1].set_xlabel('Epochs')
+    axs[1, 1].set_ylabel('Correlation')
+    axs[1, 1].grid(True)
+
+    plt.suptitle(f'Training Metrics for {name.upper()} - Baseline Model', fontsize=16)
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.show()
-
-
 
 
 def is_torch_available():
