@@ -384,7 +384,7 @@ def train_multitask(args, save_metrics, model_name):
     model_dict = {
         'baseline': MultitaskBERT,
         'LoRA': MultitaskBERT_LoRA,
-        # 'RoPE': MutitaskBERT_LoRA_RoPE
+        'RoPE': MutitaskBERT_LoRA_RoPE
     }
 
     device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
@@ -459,7 +459,7 @@ def train_multitask(args, save_metrics, model_name):
         train_loss = 0
         num_batches = 0
 
-        for dataloader in [para_train_dataloader, sst_train_dataloader, sts_train_dataloader]:
+        for dataloader in [sst_train_dataloader, para_train_dataloader, sts_train_dataloader]:
             for batch in tqdm(dataloader, desc=f'train-{epoch}', disable=TQDM_DISABLE):
                 optimizer.zero_grad()
 
@@ -543,7 +543,7 @@ def test_model(args, save_metrics, model_name):
     model_dict = {
         'baseline': MultitaskBERT,
         'LoRA': MultitaskBERT_LoRA,
-        # 'RoPE': MutitaskBERT_LoRA_RoPE
+        'RoPE': MutitaskBERT_LoRA_RoPE
     }
 
     with torch.no_grad():
@@ -618,10 +618,10 @@ def main():
     """
     0: Baseline model
     1: BERT + LoRA
-    2: BERT + RoPE
+    2: BERT + LoRA + RoPE
     """
 
-    model_name = models[1]
+    model_name = models[2]
 
     args.filepath = f'{args.option}-{args.epochs}-{args.lr}-multitask-{model_name}.pt'
     seed_everything(args.seed)  # fix the seed for reproducibility
