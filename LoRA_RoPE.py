@@ -40,7 +40,7 @@ args_dict = {
     "sts_test_out": "predictions/sts-test-output-LoRA-RoPE.csv",
 
     # hyperparameters
-    "batch_size": 32,  # 64 for sst, 8 for cfimdb can fit a 12GB GPU
+    "batch_size": 8,  # 64 for sst, 8 for cfimdb can fit a 12GB GPU
     "hidden_dropout_prob": 0.3,
     "lr": 1e-5  # 1e-3 for pretrain, 1e-5 for fine-tuning
 }
