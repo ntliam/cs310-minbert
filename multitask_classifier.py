@@ -16,7 +16,7 @@ from torch import nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from itertools import cycle
-from bert import BertModel, RoBertModel
+from bert import BertModel, RoBertModel, RMSRoBertModel, SRMSRoBertModel
 from optimizer import AdamW
 from tqdm import tqdm
 
@@ -364,6 +364,153 @@ class MutitaskBERT_LoRA_RoPE(MultitaskBERT):
 ########### End of LoRA + RoPE ###############
 
 
+########### LoRA + RoPE + RMS #############
+
+class MutitaskBERT_LoRA_RoPE_RMS(MultitaskBERT):
+    '''
+    This module should use BERT for 3 tasks:
+
+    - Sentiment classification (predict_sentiment)
+    - Paraphrase detection (predict_paraphrase)
+    - Semantic Textual Similarity (predict_similarity)
+    '''
+
+    def __init__(self, config):
+        super(MutitaskBERT_LoRA_RoPE_RMS, self).__init__(config)
+        self.config = config
+        self.bert = RMSRoBertModel.from_pretrained('bert-base-uncased')
+        add_lora_layers(self, r=8, lora_alpha=16)
+        freeze_model(self)  # freeze the non-LoRA parameters
+
+########### End of LoRA + RoPE + RMS ###############
+
+########### LoRA + RoPE + RMS #############
+
+
+class SwiGLU(nn.Module):
+    def __init__(self, hidden_size):
+        super(SwiGLU, self).__init__()
+        self.hidden_size = hidden_size
+        self.linear = nn.Linear(hidden_size, hidden_size * 2)
+
+    def forward(self, x):
+        x, gate = self.linear(x).chunk(2, dim=-1)
+        return x * F.gelu(gate)
+
+
+class MutitaskBERT_LoRA_RoPE_RMS_SwiGLU(MultitaskBERT):
+    '''
+    This module should use BERT for 3 tasks:
+
+    - Sentiment classification (predict_sentiment)
+    - Paraphrase detection (predict_paraphrase)
+    - Semantic Textual Similarity (predict_similarity)
+    '''
+
+    def __init__(self, config):
+        super(MutitaskBERT_LoRA_RoPE_RMS_SwiGLU, self).__init__(config)
+        self.config = config
+        self.bert = SRMSRoBertModel.from_pretrained('bert-base-uncased')
+        add_lora_layers(self, r=8, lora_alpha=16)
+        freeze_model(self)  # freeze the non-LoRA parameters
+
+        self.sentiment_classifier = nn.Sequential(
+            nn.Linear(BERT_HIDDEN_SIZE, BERT_HIDDEN_SIZE),
+            nn.BatchNorm1d(BERT_HIDDEN_SIZE),
+            SwiGLU(BERT_HIDDEN_SIZE),
+            nn.Dropout(config.hidden_dropout_prob),
+            nn.Linear(BERT_HIDDEN_SIZE, N_SENTIMENT_CLASSES)
+        )
+
+        self.paraphrase_classifier = nn.Sequential(
+            nn.Linear(BERT_HIDDEN_SIZE * 2, BERT_HIDDEN_SIZE),
+            nn.BatchNorm1d(BERT_HIDDEN_SIZE),
+            SwiGLU(BERT_HIDDEN_SIZE),
+            nn.Dropout(config.hidden_dropout_prob),
+            nn.Linear(BERT_HIDDEN_SIZE, 1)
+        )
+
+        self.similarity_classifier = nn.Sequential(
+            nn.Linear(1, BERT_HIDDEN_SIZE),
+            nn.BatchNorm1d(BERT_HIDDEN_SIZE),
+            SwiGLU(BERT_HIDDEN_SIZE),
+            nn.Dropout(config.hidden_dropout_prob),
+            nn.Linear(BERT_HIDDEN_SIZE, 1)
+        )
+
+    def forward(self, input_ids, attention_mask):
+        'Takes a batch of sentences and produces embeddings for them.'
+        # The final BERT embedding is the hidden state of [CLS] token (the first token)
+        # Here, you can start by just returning the embeddings straight from BERT.
+        # When thinking of improvements, you can later try modifying this
+        # (e.g., by adding other layers).
+        # TODO
+        # raise NotImplementedError
+        outputs = self.bert(input_ids, attention_mask)
+        cls_output = outputs['pooler_output']
+
+        return cls_output
+
+    def predict_sentiment(self, input_ids, attention_mask):
+        '''Given a batch of sentences, outputs logits for classifying sentiment.
+        There are 5 sentiment classes:
+        (0 - negative, 1- somewhat negative, 2- neutral, 3- somewhat positive, 4- positive)
+        Thus, your output should contain 5 logits for each sentence.
+        '''
+        # TODO
+        # raise NotImplementedError
+        # Get the BERT embeddings
+        embeddings = self.forward(input_ids, attention_mask)
+
+        # Pass the embeddings through the sentiment classifier
+        logits = self.sentiment_classifier(self.dropout(embeddings))
+        return logits
+
+    def predict_paraphrase(self,
+                           input_ids_1, attention_mask_1,
+                           input_ids_2, attention_mask_2):
+        '''Given a batch of pairs of sentences, outputs a single logit for predicting whether they are paraphrases.
+        Note that your output should be unnormalized (a logit); it will be passed to the sigmoid function
+        during evaluation, and handled as a logit by the appropriate loss function.
+        '''
+        # TODO
+        # raise NotImplementedError
+
+        # Get BERT embeddings for both sentences in each pair
+        cls_embedding_1 = self.forward(input_ids_1, attention_mask_1)
+        cls_embedding_2 = self.forward(input_ids_2, attention_mask_2)
+
+        out1 = self.dropout(cls_embedding_1)
+        out2 = self.dropout(cls_embedding_2)
+
+        # Concatenate the embeddings
+        embeddings = torch.cat((out1, out2), dim=1)
+
+        # Pass the concatenated embeddings through the paraphrase classifier
+        logits = self.paraphrase_classifier(embeddings)
+
+        return logits
+
+    def predict_similarity(self,
+                           input_ids_1, attention_mask_1,
+                           input_ids_2, attention_mask_2):
+        '''Given a batch of pairs of sentences, outputs a single logit corresponding to how similar they are.
+        Note that your output should be unnormalized (a logit).
+        '''
+        # TODO
+        # raise NotImplementedError
+        # Get BERT embeddings for both sentences in each pair
+        cls_embedding_1 = self.forward(input_ids_1, attention_mask_1)
+        cls_embedding_2 = self.forward(input_ids_2, attention_mask_2)
+
+        # Calculate cosine similarity between the embeddings
+        logits = F.cosine_similarity(cls_embedding_1, cls_embedding_2, dim=1)
+
+        return logits
+
+########### End of LoRA + RoPE + RMS ###############
+
+
 def save_model(model, optimizer, args, config, filepath):
     save_info = {
         'model': model.state_dict(),
@@ -384,7 +531,9 @@ def train_multitask(args, save_metrics, model_name='LoRA'):
     model_dict = {
         'baseline': MultitaskBERT,
         'LoRA': MultitaskBERT_LoRA,
-        'RoPE': MutitaskBERT_LoRA_RoPE
+        'RoPE': MutitaskBERT_LoRA_RoPE,
+        'RMS': MutitaskBERT_LoRA_RoPE_RMS,
+        'SwiGLU': MutitaskBERT_LoRA_RoPE_RMS_SwiGLU
     }
 
     device = torch.device('cuda') if args.use_gpu else torch.device('cpu')

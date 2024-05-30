@@ -327,3 +327,106 @@ class RoBertModel(BertModel):
             config.max_position_embeddings, config.hidden_size)
 
 #### End of RoPE ####
+
+
+#### RMSNorm ####
+
+class RMSNorm(nn.Module):
+    def __init__(self, hidden_size, eps=1e-6):
+        super(RMSNorm, self).__init__()
+        self.eps = eps
+        self.weight = nn.Parameter(torch.ones(hidden_size))
+
+    def forward(self, x):
+        # Calculate the root mean square
+        rms = torch.sqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
+        # Normalize the input
+        x_norm = x / rms
+        return self.weight * x_norm
+
+
+class RMSRoBertLayer(BertLayer):
+    def __init__(self, config):
+        super(RMSRoBertLayer, self).__init__(config)
+
+        self.attention_layer_norm = RMSNorm(
+            config.hidden_size)
+
+        self.out_layer_norm = RMSNorm(
+            config.hidden_size)
+
+
+class RMSRoBertModel(BertModel):
+    """
+    the bert model returns the final embeddings for each token in a sentence
+    it consists
+    1. embedding (used in self.embed)
+    2. a stack of n bert layers (used in self.encode)
+    3. a linear transformation layer for [CLS] token (used in self.forward, as given)
+    """
+
+    def __init__(self, config):
+        super(RMSRoBertModel, self).__init__(config)
+        self.config = config
+
+        self.embed_layer_norm = RMSNorm(
+            config.hidden_size)
+
+        self.bert_layers = nn.ModuleList(
+            [RMSRoBertLayer(config) for _ in range(config.num_hidden_layers)])
+
+        self.pos_embedding = PositionalEncoding(
+            config.max_position_embeddings, config.hidden_size)
+
+#### End of RMS ####
+
+#### SwiGLU ####
+
+
+class SwiGLU(nn.Module):
+    def __init__(self, hidden_size):
+        super(SwiGLU, self).__init__()
+        self.hidden_size = hidden_size
+        self.linear = nn.Linear(hidden_size, hidden_size * 2)
+
+    def forward(self, x):
+        x, gate = self.linear(x).chunk(2, dim=-1)
+        return x * F.gelu(gate)
+
+
+class SRMSRoBertLayer(BertLayer):
+    def __init__(self, config):
+        super(SRMSRoBertLayer, self).__init__(config)
+
+        self.attention_layer_norm = RMSNorm(
+            config.hidden_size)
+
+        self.out_layer_norm = RMSNorm(
+            config.hidden_size)
+
+        self.interm_af = SwiGLU
+
+
+class SRMSRoBertModel(BertModel):
+    """
+    the bert model returns the final embeddings for each token in a sentence
+    it consists
+    1. embedding (used in self.embed)
+    2. a stack of n bert layers (used in self.encode)
+    3. a linear transformation layer for [CLS] token (used in self.forward, as given)
+    """
+
+    def __init__(self, config):
+        super(SRMSRoBertModel, self).__init__(config)
+        self.config = config
+
+        self.embed_layer_norm = RMSNorm(
+            config.hidden_size)
+
+        self.bert_layers = nn.ModuleList(
+            [SRMSRoBertLayer(config) for _ in range(config.num_hidden_layers)])
+
+        self.pos_embedding = PositionalEncoding(
+            config.max_position_embeddings, config.hidden_size)
+
+#### End of SwiGLU ####
