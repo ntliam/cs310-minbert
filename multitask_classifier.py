@@ -44,7 +44,7 @@ def seed_everything(seed=11711):
 BERT_HIDDEN_SIZE = 768
 N_SENTIMENT_CLASSES = 5
 
-    
+
 class MultitaskBERT(nn.Module):
     '''
     This module should use BERT for 3 tasks:
@@ -90,7 +90,6 @@ class MultitaskBERT(nn.Module):
             nn.Dropout(config.hidden_dropout_prob),
             nn.Linear(BERT_HIDDEN_SIZE, 1)
         )
-
 
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
@@ -138,7 +137,6 @@ class MultitaskBERT(nn.Module):
 
         out1 = self.dropout(cls_embedding_1)
         out2 = self.dropout(cls_embedding_2)
-        
 
         # Concatenate the embeddings
         embeddings = torch.cat((out1, out2), dim=1)
@@ -344,6 +342,26 @@ class MultitaskBERT_LoRA(MultitaskBERT):
 
 
 ########### End of LoRA ###############
+
+########### LoRA + RoPE #############
+
+class MutitaskBERT_LoRA_RoPE(MultitaskBERT):
+    '''
+    This module should use BERT for 3 tasks:
+
+    - Sentiment classification (predict_sentiment)
+    - Paraphrase detection (predict_paraphrase)
+    - Semantic Textual Similarity (predict_similarity)
+    '''
+
+    def __init__(self, config):
+        super(MutitaskBERT_LoRA_RoPE, self).__init__(config)
+        self.config = config
+        self.bert = RoBertModel.from_pretrained('bert-base-uncased')
+        add_lora_layers(self, r=8, lora_alpha=16)
+        freeze_model(self)  # freeze the non-LoRA parameters
+
+########### End of LoRA + RoPE ###############
 
 
 def save_model(model, optimizer, args, config, filepath):
