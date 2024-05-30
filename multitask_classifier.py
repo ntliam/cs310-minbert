@@ -16,7 +16,7 @@ from torch import nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from itertools import cycle
-from bert import BertModel
+from bert import BertModel, RoBertModel
 from optimizer import AdamW
 from tqdm import tqdm
 
@@ -184,8 +184,8 @@ class LinearLoRA(nn.Module):
         self,
         in_dim: int,
         out_dim: int,
-        r: int = 4,
-        lora_alpha: int = 8,
+        r: int = 8,
+        lora_alpha: int = 16,
         lora_dropout: float = 0.,
     ):
         super().__init__()
@@ -241,8 +241,8 @@ def create_lora(module, r, lora_dropout, lora_alpha):
 def add_lora_layers(
     model,
     module_names: Tuple = ("query", "value"),
-    r: int = 4,
-    lora_alpha: float = 8,
+    r: int = 8,
+    lora_alpha: float = 16,
     lora_dropout: float = 0.1,
     ignore_layers: List[int] = []
 ):
@@ -332,15 +332,25 @@ class MultitaskBERT_LoRA(MultitaskBERT):
     def __init__(self, config):
         super(MultitaskBERT_LoRA, self).__init__(config)
         # inject the LoRA layers into the model
+        self.config = config
+
         add_lora_layers(self, r=8, lora_alpha=16)
         freeze_model(self)  # freeze the non-LoRA parameters
 
 
 ########### End of LoRA ###############
 
-########### LoRA + RoFormer #############
+########### LoRA + RoPE #############
 
-class MultitaskBERT_LoRA_RoFormer(MultitaskBERT_LoRA):
+def get_sinusoidal_positional_embeddings(seq_len, dim):
+    position_ids = torch.arange(seq_len, dtype=torch.float).unsqueeze(1)
+    indices = torch.arange(dim // 2, dtype=torch.float).unsqueeze(0)
+    angle_rates = 1 / torch.pow(10000, (2 * indices) / dim)
+    sinusoidal_pos = position_ids * angle_rates
+    return torch.sin(sinusoidal_pos), torch.cos(sinusoidal_pos)
+
+
+class MutitaskBERT_LoRA_RoPE(MultitaskBERT):
     '''
     This module should use BERT for 3 tasks:
 
@@ -350,9 +360,90 @@ class MultitaskBERT_LoRA_RoFormer(MultitaskBERT_LoRA):
     '''
 
     def __init__(self, config):
-        super(MultitaskBERT_LoRA_RoFormer, self).__init__(config)
+        super(MutitaskBERT_LoRA_RoPE, self).__init__(config)
+        self.config = config
+        self.bert = RoBertModel.from_pretrained('bert-base-uncased')
+        add_lora_layers(self, r=8, lora_alpha=16)
+        freeze_model(self)  # freeze the non-LoRA parameters
 
-########### End of LoRA + RoFormer ###############
+    def forward(self, input_ids, attention_mask):
+        'Takes a batch of sentences and produces embeddings for them.'
+        # The final BERT embedding is the hidden state of [CLS] token (the first token)
+        # Here, you can start by just returning the embeddings straight from BERT.
+        # When thinking of improvements, you can later try modifying this
+        # (e.g., by adding other layers).
+        # TODO
+        # raise NotImplementedError
+        seq_length = input_ids.size(1)
+        sinusoidal_pos = get_sinusoidal_positional_embeddings(
+            seq_length, self.config.hidden_size)
+
+        outputs = self.bert(input_ids, attention_mask, sinusoidal_pos)
+        cls_output = outputs['pooler_output']
+
+        return cls_output
+
+    def predict_sentiment(self, input_ids, attention_mask):
+        '''Given a batch of sentences, outputs logits for classifying sentiment.
+        There are 5 sentiment classes:
+        (0 - negative, 1- somewhat negative, 2- neutral, 3- somewhat positive, 4- positive)
+        Thus, your output should contain 5 logits for each sentence.
+        '''
+
+        # TODO
+        # raise NotImplementedError
+        # Get the BERT embeddings
+        embeddings = self.forward(input_ids, attention_mask)
+
+        # Pass the embeddings through the sentiment classifier
+        logits = self.sentiment_classifier(self.dropout(embeddings))
+        return logits
+
+    def predict_paraphrase(self,
+                           input_ids_1, attention_mask_1,
+                           input_ids_2, attention_mask_2):
+        '''Given a batch of pairs of sentences, outputs a single logit for predicting whether they are paraphrases.
+        Note that your output should be unnormalized (a logit); it will be passed to the sigmoid function
+        during evaluation, and handled as a logit by the appropriate loss function.
+        '''
+        # TODO
+        # raise NotImplementedError
+
+        # Get BERT embeddings for both sentences in each pair
+        cls_embedding_1 = self.forward(
+            input_ids_1, attention_mask_1)
+        cls_embedding_2 = self.forward(
+            input_ids_2, attention_mask_2)
+
+        # Concatenate the embeddings
+        embeddings = torch.cat((cls_embedding_1, cls_embedding_2), dim=1)
+
+        # Pass the concatenated embeddings through the paraphrase classifier
+        logits = self.paraphrase_classifier(embeddings)
+
+        return logits
+
+    def predict_similarity(self,
+                           input_ids_1, attention_mask_1,
+                           input_ids_2, attention_mask_2):
+        '''Given a batch of pairs of sentences, outputs a single logit corresponding to how similar they are.
+        Note that your output should be unnormalized (a logit).
+        '''
+        # TODO
+        # raise NotImplementedError
+
+        # Get BERT embeddings for both sentences in each pair
+        cls_embedding_1 = self.forward(
+            input_ids_1, attention_mask_1)
+        cls_embedding_2 = self.forward(
+            input_ids_2, attention_mask_2)
+
+        # Calculate cosine similarity between the embeddings
+        logits = F.cosine_similarity(cls_embedding_1, cls_embedding_2, dim=1)
+
+        return logits
+
+########### End of LoRA + RoPE ###############
 
 
 def save_model(model, optimizer, args, config, filepath):
@@ -375,7 +466,7 @@ def train_multitask(args, save_metrics, model_name='baseline'):
     model_dict = {
         'baseline': MultitaskBERT,
         'LoRA': MultitaskBERT_LoRA,
-        'RoFormer': MultitaskBERT_LoRA_RoFormer
+        'RoPE': MutitaskBERT_LoRA_RoPE
     }
 
     device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
