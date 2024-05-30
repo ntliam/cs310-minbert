@@ -590,7 +590,8 @@ def train_multitask(args, save_metrics, model_name):
 
     model = model.to(device)
     print("========================Model Created========================")
-
+    print()
+    print("Device: ", device)
     print("Model Name: ", model_name)
 
     lr = args.lr
@@ -692,7 +693,9 @@ def test_model(args, save_metrics, model_name):
     model_dict = {
         'baseline': MultitaskBERT,
         'LoRA': MultitaskBERT_LoRA,
-        'RoPE': MutitaskBERT_LoRA_RoPE
+        'RoPE': MutitaskBERT_LoRA_RoPE,
+        'RMS': MutitaskBERT_LoRA_RoPE_RMS,
+        'SwiGLU': MutitaskBERT_LoRA_RoPE_RMS_SwiGLU
     }
 
     with torch.no_grad():
@@ -762,12 +765,14 @@ def get_args():
 def main():
     args = get_args()
     # save path
-    models = ['baseline', 'LoRA', 'RoPE']
+    models = ['baseline', 'LoRA', 'RoPE', 'RMS', 'SwiGLU']
 
     """
-    0: Baseline model
+    0: Baseline BERT
     1: BERT + LoRA
     2: BERT + LoRA + RoPE
+    3: BERT + LoRA + RoPE + RMS
+    4: BERT + LoRA + RoPE + RMS + SwiGLU
     """
 
     model_name = models[2]
@@ -795,10 +800,10 @@ def main():
     test_model(args, save_metrics, model_name)
 
     # Save save_metrics to a JSON file
-    with open(f'stats/multitask_{model_name}_saved_metrics.json', 'w') as f:
+    with open(f'./stats/multitask_{model_name}_saved_metrics.json', 'w') as f:
         json.dump(save_metrics, f, indent=4)
 
-    print(f'stats/multitask_{model_name}_saved_metrics.json')
+    print(f'Metrics saved to ./stats/multitask_{model_name}_saved_metrics.json')
 
 
 if __name__ == "__main__":

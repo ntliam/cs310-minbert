@@ -1,14 +1,14 @@
-Total Trainable Parameters: 2077447
+Total Trainable Parameters: 5620999
 
-<bound method Module.parameters of MutitaskBERT_LoRA_RoPE_RMS(
-  (bert): RMSRoBertModel(
+<bound method Module.parameters of MutitaskBERT_LoRA_RoPE_RMS_SwiGLU(
+  (bert): SRMSRoBertModel(
     (word_embedding): Embedding(30522, 768, padding_idx=0)
     (pos_embedding): PositionalEncoding()
     (tk_type_embedding): Embedding(2, 768)
     (embed_layer_norm): RMSNorm()
     (embed_dropout): Dropout(p=0.0, inplace=False)
     (bert_layers): ModuleList(
-      (0-11): 12 x RMSRoBertLayer(
+      (0-11): 12 x SRMSRoBertLayer(
         (self_attention): BertSelfAttention(
           (query): LinearLoRA(
             (lora_dropout): Dropout(p=0.1, inplace=False)
@@ -40,22 +40,28 @@ Total Trainable Parameters: 2077447
   (sentiment_classifier): Sequential(
     (0): Linear(in_features=768, out_features=768, bias=True)
     (1): BatchNorm1d(768, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (2): GELU(approximate='none')
-    (3): Dropout(p=0.0, inplace=False)
+    (2): SwiGLU(
+      (linear): Linear(in_features=768, out_features=1536, bias=True)
+    )
+    (3): Dropout(p=0.3, inplace=False)
     (4): Linear(in_features=768, out_features=5, bias=True)
   )
   (paraphrase_classifier): Sequential(
     (0): Linear(in_features=1536, out_features=768, bias=True)
     (1): BatchNorm1d(768, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (2): GELU(approximate='none')
-    (3): Dropout(p=0.0, inplace=False)
+    (2): SwiGLU(
+      (linear): Linear(in_features=768, out_features=1536, bias=True)
+    )
+    (3): Dropout(p=0.3, inplace=False)
     (4): Linear(in_features=768, out_features=1, bias=True)
   )
   (similarity_classifier): Sequential(
     (0): Linear(in_features=1, out_features=768, bias=True)
     (1): BatchNorm1d(768, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (2): GELU(approximate='none')
-    (3): Dropout(p=0.0, inplace=False)
+    (2): SwiGLU(
+      (linear): Linear(in_features=768, out_features=1536, bias=True)
+    )
+    (3): Dropout(p=0.3, inplace=False)
     (4): Linear(in_features=768, out_features=1, bias=True)
   )
   (dropout): Dropout(p=0.0, inplace=False)
