@@ -274,20 +274,6 @@ class BertModel(BertPreTrainedModel):
 #### RoFormer ####
 
 
-def apply_rotary(x, sinusoidal_pos):
-    sin, cos = sinusoidal_pos
-    x1, x2 = x[..., 0::2], x[..., 1::2]
-    return torch.cat([x1 * cos - x2 * sin, x1 * sin + x2 * cos], dim=-1)
-
-
-def get_sinusoidal_positional_embeddings(seq_len, dim):
-    position_ids = torch.arange(seq_len, dtype=torch.float).unsqueeze(1)
-    indices = torch.arange(dim // 2, dtype=torch.float).unsqueeze(0)
-    angle_rates = 1 / torch.pow(10000, (2 * indices) / dim)
-    sinusoidal_pos = position_ids * angle_rates
-    return torch.sin(sinusoidal_pos), torch.cos(sinusoidal_pos)
-
-
 class RoBertSelfAttention(BertSelfAttention):
     def __init__(self, config):
         super(RoBertSelfAttention, self).__init__(config)
@@ -304,10 +290,6 @@ class RoBertSelfAttention(BertSelfAttention):
         value_layer = self.transform(hidden_states, self.value)
         query_layer = self.transform(hidden_states, self.query)
 
-        # Apply rotary embeddings
-        key_layer = apply_rotary(key_layer, sinusoidal_pos)
-        query_layer = apply_rotary(query_layer, sinusoidal_pos)
-
         # calculate the multi-head attention
         attn_value = self.attention(
             key_layer, query_layer, value_layer, attention_mask)
@@ -320,9 +302,42 @@ class RoBertLayer(BertLayer):
         self.self_attention = RoBertSelfAttention(config)
 
 
+class PositionalEncoding(nn.Module):
+    def __init__(self, max_len, d_model):
+        super(PositionalEncoding, self).__init__()
+
+        pe = torch.zeros(max_len, d_model)  # (max_len, d_model)
+        pe.requires_grad = False
+        position = torch.arange(0, max_len).unsqueeze(1)
+
+        div_term = torch.exp(torch.arange(0, d_model, 2)
+                             * -(math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+
+        self.max_len = max_len
+        self.d_model = d_model
+        self.pe = pe.unsqueeze(0)  # (1, max_len, d_model)
+        # self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        # x: (batch, max_len)
+        batch = x.size(0)
+
+        # x = x + self.pe[:, :x.size(1)]
+        # self.pe[:, :x.size(1)]
+        # print(f"first: {self.pe.shape}")
+        # print(f"third: {self.pe.repeat(batch, 1, 1).shape}")
+        return self.pe.repeat(batch, 1, 1)  # (batch, max_len, d_model)
+
+
 class RoBertModel(BertModel):
     def __init__(self, config):
         super(RoBertModel, self).__init__(config)
+
+        self.pos_embedding = PositionalEncoding(
+            config.max_position_embeddings, config.hidden_size)
+
         self.bert_layers = nn.ModuleList(
             [RoBertLayer(config) for _ in range(config.num_hidden_layers)])
 
