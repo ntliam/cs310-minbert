@@ -466,7 +466,7 @@ def save_model(model, optimizer, args, config, filepath):
     print(f"save the model to {filepath}")
 
 
-def train_multitask(args, save_metrics, model_name='baseline'):
+def train_multitask(args, save_metrics, model_name='LoRA'):
 
     model_dict = {
         'baseline': MultitaskBERT,
@@ -529,11 +529,14 @@ def train_multitask(args, save_metrics, model_name='baseline'):
     model = model.to(device)
     print("========================Model Created========================")
 
+    print("Model Name: ", model_name)
+
     lr = args.lr
     optimizer = AdamW(model.parameters(), lr=lr)
     best_avg_normalized_score = 0
 
     print("========================Training========================")
+
     # Mixed precision training
     scaler = torch.cuda.amp.GradScaler()
 
@@ -622,13 +625,20 @@ def train_multitask(args, save_metrics, model_name='baseline'):
         save_metrics["train_avg_normalized_score"].append(avg_normalized_score)
 
 
-def test_model(args, save_metrics):
+def test_model(args, save_metrics, model_name):
+
+    model_dict = {
+        'baseline': MultitaskBERT,
+        'LoRA': MultitaskBERT_LoRA,
+        'RoPE': MutitaskBERT_LoRA_RoPE
+    }
+
     with torch.no_grad():
         device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
         saved = torch.load(args.filepath)
         config = saved['model_config']
 
-        model = MultitaskBERT(config)
+        model = model_dict[model_name](config)
         model.load_state_dict(saved['model'])
         model = model.to(device)
         print(f"Loaded model to test from {args.filepath}")
@@ -690,7 +700,11 @@ def get_args():
 def main():
     args = get_args()
     # save path
-    args.filepath = f'{args.option}-{args.epochs}-{args.lr}-multitask.pt'
+    models = ['baseline', 'LoRA', 'RoPE']
+
+    model_name = models[1]
+
+    args.filepath = f'{args.option}-{args.epochs}-{args.lr}-multitask-{model_name}.pt'
     seed_everything(args.seed)  # fix the seed for reproducibility
 
     save_metrics = {
@@ -709,14 +723,14 @@ def main():
         "test_sts_corr": []
     }
 
-    train_multitask(args, save_metrics)
-    test_model(args, save_metrics)
+    train_multitask(args, save_metrics, model_name=model_name)
+    test_model(args, save_metrics, model_name)
 
     # Save save_metrics to a JSON file
-    with open('stats/multitask_saved_metrics.json', 'w') as f:
+    with open(f'stats/multitask_{model_name}_saved_metrics.json', 'w') as f:
         json.dump(save_metrics, f, indent=4)
 
-    print('Metrics saved to multitask_saved_metrics.json')
+    print(f'stats/multitask_{model_name}_saved_metrics.json')
 
 
 if __name__ == "__main__":
