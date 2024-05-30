@@ -361,11 +361,12 @@ def save_model(model, optimizer, args, config, filepath):
     print(f"save the model to {filepath}")
 
 
-def train_multitask(args, save_metrics, model_name='LoRA'):
+def train_multitask(args, save_metrics, model_name):
 
     model_dict = {
         'baseline': MultitaskBERT,
-        'LoRA': MultitaskBERT_LoRA
+        'LoRA': MultitaskBERT_LoRA,
+        # 'RoPE': MutitaskBERT_LoRA_RoPE
     }
 
     device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
@@ -440,7 +441,7 @@ def train_multitask(args, save_metrics, model_name='LoRA'):
         train_loss = 0
         num_batches = 0
 
-        for dataloader in [sst_train_dataloader, para_train_dataloader, sts_train_dataloader]:
+        for dataloader in [para_train_dataloader, sst_train_dataloader, sts_train_dataloader]:
             for batch in tqdm(dataloader, desc=f'train-{epoch}', disable=TQDM_DISABLE):
                 optimizer.zero_grad()
 
@@ -595,6 +596,12 @@ def main():
     args = get_args()
     # save path
     models = ['baseline', 'LoRA', 'RoPE']
+
+    """
+    0: Baseline model
+    1: BERT + LoRA
+    2: BERT + RoPE
+    """
 
     model_name = models[1]
 
