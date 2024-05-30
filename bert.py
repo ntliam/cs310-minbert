@@ -125,7 +125,7 @@ class BertLayer(nn.Module):
 
         return output
 
-    def forward(self, hidden_states, attention_mask, sinusoidal_pos):
+    def forward(self, hidden_states, attention_mask):
         """
         hidden_states: either from the embedding layer (first bert layer) or from the previous bert layer
         as shown in the left of Figure 1 of https://arxiv.org/pdf/1706.03762.pdf 
@@ -139,8 +139,7 @@ class BertLayer(nn.Module):
         # raise NotImplementedError
 
         # Multi-head self-attention
-        attention_output = self.self_attention(
-            hidden_states, attention_mask, sinusoidal_pos)
+        attention_output = self.self_attention(hidden_states, attention_mask)
 
         # Add-Norm after attention
         attention_output = self.add_norm(hidden_states,
@@ -271,139 +270,20 @@ class BertModel(BertPreTrainedModel):
 
         return {'last_hidden_state': sequence_output, 'pooler_output': first_tk}
 
-#### RoFormer ####
-
-
-class RoBertSelfAttention(BertSelfAttention):
-    def __init__(self, config):
-        super(RoBertSelfAttention, self).__init__(config)
-
-    def forward(self, hidden_states, attention_mask, sinusoidal_pos):
-        """
-        hidden_states: [bs, seq_len, hidden_state]
-        attention_mask: [bs, 1, 1, seq_len]
-        output: [bs, seq_len, hidden_state]
-        """
-        # first, we have to generate the key, value, query for each token for multi-head attention w/ transform (more details inside the function)
-        # of *_layers are of [bs, num_attention_heads, seq_len, attention_head_size]
-        key_layer = self.transform(hidden_states, self.key)
-        value_layer = self.transform(hidden_states, self.value)
-        query_layer = self.transform(hidden_states, self.query)
-
-        # calculate the multi-head attention
-        attn_value = self.attention(
-            key_layer, query_layer, value_layer, attention_mask)
-        return attn_value
-
-
-class RoBertLayer(BertLayer):
-    def __init__(self, config):
-        super(RoBertLayer, self).__init__(config)
-        self.self_attention = RoBertSelfAttention(config)
-
-
-class PositionalEncoding(nn.Module):
-    def __init__(self, max_len, d_model):
-        super(PositionalEncoding, self).__init__()
-
-        pe = torch.zeros(max_len, d_model)  # (max_len, d_model)
-        pe.requires_grad = False
-        position = torch.arange(0, max_len).unsqueeze(1)
-
-        div_term = torch.exp(torch.arange(0, d_model, 2)
-                             * -(math.log(10000.0) / d_model))
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
-
-        self.max_len = max_len
-        self.d_model = d_model
-        self.pe = pe.unsqueeze(0)  # (1, max_len, d_model)
-        # self.register_buffer('pe', pe)
-
-    def forward(self, x):
-        # x: (batch, max_len)
-        batch = x.size(0)
-
-        # x = x + self.pe[:, :x.size(1)]
-        # self.pe[:, :x.size(1)]
-        # print(f"first: {self.pe.shape}")
-        # print(f"third: {self.pe.repeat(batch, 1, 1).shape}")
-        return self.pe.repeat(batch, 1, 1)  # (batch, max_len, d_model)
+#### RoPE ####
 
 
 class RoBertModel(BertModel):
+    """
+    the bert model returns the final embeddings for each token in a sentence
+    it consists
+    1. embedding (used in self.embed)
+    2. a stack of n bert layers (used in self.encode)
+    3. a linear transformation layer for [CLS] token (used in self.forward, as given)
+    """
+
     def __init__(self, config):
         super(RoBertModel, self).__init__(config)
+        self.config = config
 
-        self.pos_embedding = PositionalEncoding(
-            config.max_position_embeddings, config.hidden_size)
-
-        self.bert_layers = nn.ModuleList(
-            [RoBertLayer(config) for _ in range(config.num_hidden_layers)])
-
-        self.init_weights()
-
-    def embed(self, input_ids):
-        input_shape = input_ids.size()
-        seq_length = input_shape[1]
-
-        # Get word embedding from self.word_embedding into input_embeds.
-        inputs_embeds = self.word_embedding(input_ids)
-
-        # Get position index and position embedding from self.pos_embedding into pos_embeds.
-        # pos_ids = self.position_ids[:, :seq_length]
-
-        # Generate sinusoidal positional embeddings for RoPE
-        sinusoidal_pos = get_sinusoidal_positional_embeddings(
-            seq_length, self.config.hidden_size)
-
-        # Get token type ids, since we are not consider token type, just a placeholder.
-        tk_type_ids = torch.zeros(
-            input_shape, dtype=torch.long, device=input_ids.device)
-        tk_type_embeds = self.tk_type_embedding(tk_type_ids)
-
-        # Add three embeddings together; then apply embed_layer_norm and dropout and return.
-        embeds = inputs_embeds + tk_type_embeds
-        embeds = self.embed_layer_norm(embeds)
-        embeds = self.embed_dropout(embeds)
-
-        return embeds, sinusoidal_pos
-
-    def encode(self, hidden_states, attention_mask, sinusoidal_pos):
-        """
-        hidden_states: the output from the embedding layer [batch_size, seq_len, hidden_size]
-        attention_mask: [batch_size, seq_len]
-        sinusoidal_pos: Sinusoidal positional embeddings for RoPE
-        """
-        # get the extended attention mask for self attention
-        extended_attention_mask: torch.Tensor = get_extended_attention_mask(
-            attention_mask, self.dtype)
-
-        # pass the hidden states through the encoder layers
-        for i, layer_module in enumerate(self.bert_layers):
-            # feed the encoding from the last bert_layer to the next
-            hidden_states = layer_module(
-                hidden_states, extended_attention_mask, sinusoidal_pos)
-
-        return hidden_states
-
-    def forward(self, input_ids, attention_mask, sinusoidal_pos):
-        """
-        input_ids: [batch_size, seq_len], seq_len is the max length of the batch
-        attention_mask: same size as input_ids, 1 represents non-padding tokens, 0 represents padding tokens
-        """
-        # get the embedding for each input token
-        embedding_output, sinusoidal_pos = self.embed(input_ids=input_ids)
-
-        # feed to a transformer (a stack of BertLayers)
-        sequence_output = self.encode(
-            embedding_output, attention_mask=attention_mask, sinusoidal_pos=sinusoidal_pos)
-
-        # get cls token hidden state
-        first_tk = sequence_output[:, 0]
-        first_tk = self.pooler_dense(first_tk)
-        first_tk = self.pooler_af(first_tk)
-
-        return {'last_hidden_state': sequence_output, 'pooler_output': first_tk}
-
-#### End of RoFormer ####
+#### End of RoPE ####
