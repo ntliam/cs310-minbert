@@ -135,8 +135,11 @@ class MultitaskBERT(nn.Module):
         cls_embedding_1 = self.forward(input_ids_1, attention_mask_1)
         cls_embedding_2 = self.forward(input_ids_2, attention_mask_2)
 
+        out1 = self.dropout(cls_embedding_1)
+        out2 = self.dropout(cls_embedding_2)
+
         # Concatenate the embeddings
-        embeddings = torch.cat((cls_embedding_1, cls_embedding_2), dim=1)
+        embeddings = torch.cat((out1, out2), dim=1)
 
         # Pass the concatenated embeddings through the paraphrase classifier
         logits = self.paraphrase_classifier(embeddings)
@@ -342,14 +345,6 @@ class MultitaskBERT_LoRA(MultitaskBERT):
 
 ########### LoRA + RoPE #############
 
-def get_sinusoidal_positional_embeddings(seq_len, dim):
-    position_ids = torch.arange(seq_len, dtype=torch.float).unsqueeze(1)
-    indices = torch.arange(dim // 2, dtype=torch.float).unsqueeze(0)
-    angle_rates = 1 / torch.pow(10000, (2 * indices) / dim)
-    sinusoidal_pos = position_ids * angle_rates
-    return torch.sin(sinusoidal_pos), torch.cos(sinusoidal_pos)
-
-
 class MutitaskBERT_LoRA_RoPE(MultitaskBERT):
     '''
     This module should use BERT for 3 tasks:
@@ -384,12 +379,11 @@ def save_model(model, optimizer, args, config, filepath):
     print(f"save the model to {filepath}")
 
 
-def train_multitask(args, save_metrics, model_name='baseline'):
+def train_multitask(args, save_metrics, model_name='LoRA'):
 
     model_dict = {
         'baseline': MultitaskBERT,
-        'LoRA': MultitaskBERT_LoRA,
-        'RoPE': MutitaskBERT_LoRA_RoPE
+        'LoRA': MultitaskBERT_LoRA
     }
 
     device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
@@ -447,12 +441,18 @@ def train_multitask(args, save_metrics, model_name='baseline'):
     model = model.to(device)
     print("========================Model Created========================")
 
+    print("Model Name: ", model_name)
+
     lr = args.lr
     optimizer = AdamW(model.parameters(), lr=lr)
     best_avg_normalized_score = 0
 
     print("========================Training========================")
-    # Run for the specified number of epochs
+
+    # Mixed precision training
+    scaler = torch.cuda.amp.GradScaler()
+
+    # Training loop with mixed precision
     for epoch in range(args.epochs):
         model.train()
         train_loss = 0
@@ -503,8 +503,10 @@ def train_multitask(args, save_metrics, model_name='baseline'):
                             input_ids_1, attention_mask_1, input_ids_2, attention_mask_2)
                         loss = F.mse_loss(cos_sim.squeeze(), labels_scaled)
 
-                loss.backward()
-                optimizer.step()
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+
                 train_loss += loss.item()
                 num_batches += 1
 
@@ -535,13 +537,20 @@ def train_multitask(args, save_metrics, model_name='baseline'):
         save_metrics["train_avg_normalized_score"].append(avg_normalized_score)
 
 
-def test_model(args, save_metrics):
+def test_model(args, save_metrics, model_name):
+
+    model_dict = {
+        'baseline': MultitaskBERT,
+        'LoRA': MultitaskBERT_LoRA,
+        # 'RoPE': MutitaskBERT_LoRA_RoPE
+    }
+
     with torch.no_grad():
         device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
         saved = torch.load(args.filepath)
         config = saved['model_config']
 
-        model = MultitaskBERT(config)
+        model = model_dict[model_name](config)
         model.load_state_dict(saved['model'])
         model = model.to(device)
         print(f"Loaded model to test from {args.filepath}")
@@ -592,7 +601,7 @@ def get_args():
 
     # hyper parameters
     parser.add_argument(
-        "--batch_size", help='sst: 64, cfimdb: 8 can fit a 12GB GPU', type=int, default=8)
+        "--batch_size", help='sst: 64, cfimdb: 8 can fit a 12GB GPU', type=int, default=32)
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.3)
     parser.add_argument("--lr", type=float, help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
                         default=1e-5)
@@ -603,7 +612,11 @@ def get_args():
 def main():
     args = get_args()
     # save path
-    args.filepath = f'{args.option}-{args.epochs}-{args.lr}-multitask.pt'
+    models = ['baseline', 'LoRA', 'RoPE']
+
+    model_name = models[1]
+
+    args.filepath = f'{args.option}-{args.epochs}-{args.lr}-multitask-{model_name}.pt'
     seed_everything(args.seed)  # fix the seed for reproducibility
 
     save_metrics = {
@@ -622,14 +635,14 @@ def main():
         "test_sts_corr": []
     }
 
-    train_multitask(args, save_metrics)
-    test_model(args, save_metrics)
+    train_multitask(args, save_metrics, model_name=model_name)
+    test_model(args, save_metrics, model_name)
 
     # Save save_metrics to a JSON file
-    with open('stats/multitask_saved_metrics.json', 'w') as f:
+    with open(f'stats/multitask_{model_name}_saved_metrics.json', 'w') as f:
         json.dump(save_metrics, f, indent=4)
 
-    print('Metrics saved to multitask_saved_metrics.json')
+    print(f'stats/multitask_{model_name}_saved_metrics.json')
 
 
 if __name__ == "__main__":
