@@ -692,8 +692,12 @@ def test_model(args, save_metrics, model_name):
     model_dict = {
         'baseline': MultitaskBERT,
         'LoRA': MultitaskBERT_LoRA,
-        # 'RoPE': MutitaskBERT_LoRA_RoPE
+        'RoPE': MutitaskBERT_LoRA_RoPE,
+        'RMS': MutitaskBERT_LoRA_RoPE_RMS,
+        'SwiGLU': MutitaskBERT_LoRA_RoPE_RMS_SwiGLU
     }
+
+
 
     with torch.no_grad():
         device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
