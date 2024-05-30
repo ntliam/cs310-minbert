@@ -524,7 +524,7 @@ def test_model(args, save_metrics, model_name):
     model_dict = {
         'baseline': MultitaskBERT,
         'LoRA': MultitaskBERT_LoRA,
-        'RoPE': MutitaskBERT_LoRA_RoPE
+        # 'RoPE': MutitaskBERT_LoRA_RoPE
     }
 
     with torch.no_grad():
