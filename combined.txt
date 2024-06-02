@@ -1,6 +1,6 @@
-Total Trainable Parameters: 5454343
+Total Trainable Parameters: 8995591
 
-<bound method Module.parameters of MultitaskBERT_LoRA(
+<bound method Module.parameters of MultitaskBERT_combined(
   (bert): BertModel(
     (word_embedding): Embedding(30522, 768, padding_idx=0)
     (pos_embedding): Embedding(512, 768)
@@ -44,22 +44,31 @@ Total Trainable Parameters: 5454343
   )
   (sentiment_classifier): Sequential(
     (0): Linear(in_features=768, out_features=768, bias=True)
-    (1): BatchNorm1d(768, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (2): GELU(approximate='none')
+    (1): RMSNorm()
+    (2): SwiGLU(
+      (linear1): Linear(in_features=768, out_features=768, bias=True)
+      (linear2): Linear(in_features=768, out_features=768, bias=True)
+    )
     (3): Dropout(p=0.0, inplace=False)
     (4): Linear(in_features=768, out_features=5, bias=True)
   )
   (paraphrase_classifier): Sequential(
     (0): Linear(in_features=1536, out_features=768, bias=True)
-    (1): BatchNorm1d(768, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (2): GELU(approximate='none')
+    (1): RMSNorm()
+    (2): SwiGLU(
+      (linear1): Linear(in_features=768, out_features=768, bias=True)
+      (linear2): Linear(in_features=768, out_features=768, bias=True)
+    )
     (3): Dropout(p=0.0, inplace=False)
     (4): Linear(in_features=768, out_features=1, bias=True)
   )
   (similarity_classifier): Sequential(
     (0): Linear(in_features=1, out_features=768, bias=True)
-    (1): BatchNorm1d(768, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (2): GELU(approximate='none')
+    (1): RMSNorm()
+    (2): SwiGLU(
+      (linear1): Linear(in_features=768, out_features=768, bias=True)
+      (linear2): Linear(in_features=768, out_features=768, bias=True)
+    )
     (3): Dropout(p=0.0, inplace=False)
     (4): Linear(in_features=768, out_features=1, bias=True)
   )

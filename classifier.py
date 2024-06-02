@@ -270,6 +270,12 @@ class BERT_RMSNorm(BertSentimentClassifier):
         super(BERT_RMSNorm, self).__init__(config)
         self.config = config
         self.bert._replace_layernorm_with_rmsnorm()
+        for name, param in self.named_parameters():
+            if "rms" not in name:
+                param.requires_grad = False
+            else:
+                print(name)
+                param.requires_grad = True
 
 #### End of RMSNorm ####
 

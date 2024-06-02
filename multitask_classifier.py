@@ -16,7 +16,7 @@ from torch import nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from itertools import cycle
-from bert import BertModel, RoBertModel, RMSRoBertModel, SRMSRoBertModel
+from bert import BertModel
 from optimizer import AdamW
 from tqdm import tqdm
 
@@ -204,11 +204,12 @@ class LinearLoRA(nn.Module):
         self.pretrained.weight.requires_grad = False
 
         # create the low-rank A matrix and initialize with same method as in Hugging Face PEFT library
-        self.lora_A = nn.Linear(in_dim, r, bias=False)
-        nn.init.kaiming_uniform_(self.lora_A.weight, a=math.sqrt(5))
+        self.lora_A = nn.Linear(in_dim, r, bias=True)
+        # nn.init.kaiming_uniform_(self.lora_A.weight, a=math.sqrt(5))
+        nn.init.normal_(self.lora_A.weight, mean=0.0, std=0.02)
 
         # create the low-rank B matrix and initialize to zero
-        self.lora_B = nn.Linear(r, out_dim, bias=False)
+        self.lora_B = nn.Linear(r, out_dim, bias=True)
         nn.init.constant_(self.lora_B.weight, 0)
 
         # scaling constant
@@ -233,6 +234,7 @@ def freeze_model(model):
 def create_lora(module, r, lora_dropout, lora_alpha):
     """Converts a linear module to a LoRA linear module."""
     k, d = module.weight.shape  # pytorch nn.Linear weights are transposed, that is why shape is (k, d) and not (d, k)
+    # (768, 768)
     lora = LinearLoRA(d, k, r, lora_dropout=lora_dropout,
                       lora_alpha=lora_alpha)
     with torch.no_grad():
@@ -243,10 +245,10 @@ def create_lora(module, r, lora_dropout, lora_alpha):
 
 def add_lora_layers(
     model,
-    module_names: Tuple = ("query", "value"),
-    r: int = 8,
-    lora_alpha: float = 16,
-    lora_dropout: float = 0.1,
+    module_names: Tuple = ("query", "value", "key"),
+    r: int = 64,
+    lora_alpha: float = 256,
+    lora_dropout: float = 0.3,
     ignore_layers: List[int] = []
 ):
     """
@@ -324,28 +326,35 @@ def merge_lora_layers(model, module_names: Tuple = ("query", "value"), dropout=0
 
 
 class MultitaskBERT_LoRA(MultitaskBERT):
-    '''
-    This module should use BERT for 3 tasks:
-
-    - Sentiment classification (predict_sentiment)
-    - Paraphrase detection (predict_paraphrase)
-    - Semantic Textual Similarity (predict_similarity)
-    '''
-
     def __init__(self, config):
         super(MultitaskBERT_LoRA, self).__init__(config)
         # inject the LoRA layers into the model
         self.config = config
 
-        add_lora_layers(self, r=8, lora_alpha=16)
-        freeze_model(self)  # freeze the non-LoRA parameters
-
+        add_lora_layers(self)
+        for name, param in self.named_parameters():
+            if "lora" not in name and "classifier" not in name and "bias" not in name:
+                param.requires_grad = False
+            else:
+                param.requires_grad = True
 
 ########### End of LoRA ###############
 
-########### LoRA + RoPE #############
+########### RMSNorm #############
 
-class MutitaskBERT_LoRA_RoPE(MultitaskBERT):
+
+class RMSNorm(nn.Module):
+    def __init__(self, hidden_dim=768, eps=1e-8):
+        super(RMSNorm, self).__init__()
+        self.eps = eps
+        self.weight = nn.Parameter(torch.ones(hidden_dim))
+
+    def forward(self, x):
+        rms = x.pow(2).mean(-1, keepdim=True).sqrt()
+        return x / (rms + self.eps) * self.weight
+
+
+class MultitaskBERT_RMS(MultitaskBERT):
     '''
     This module should use BERT for 3 tasks:
 
@@ -355,64 +364,55 @@ class MutitaskBERT_LoRA_RoPE(MultitaskBERT):
     '''
 
     def __init__(self, config):
-        super(MutitaskBERT_LoRA_RoPE, self).__init__(config)
+        super(MultitaskBERT_RMS, self).__init__(config)
         self.config = config
-        self.bert = RoBertModel.from_pretrained('bert-base-uncased')
-        add_lora_layers(self, r=8, lora_alpha=16)
-        freeze_model(self)  # freeze the non-LoRA parameters
 
-########### End of LoRA + RoPE ###############
+        self.sentiment_classifier = nn.Sequential(
+            nn.Linear(BERT_HIDDEN_SIZE, BERT_HIDDEN_SIZE),
+            RMSNorm(BERT_HIDDEN_SIZE),
+            nn.GELU(),
+            nn.Dropout(config.hidden_dropout_prob),
+            nn.Linear(BERT_HIDDEN_SIZE, N_SENTIMENT_CLASSES)
+        )
 
+        self.paraphrase_classifier = nn.Sequential(
+            nn.Linear(BERT_HIDDEN_SIZE * 2, BERT_HIDDEN_SIZE),
+            RMSNorm(BERT_HIDDEN_SIZE),
+            nn.GELU(),
+            nn.Dropout(config.hidden_dropout_prob),
+            nn.Linear(BERT_HIDDEN_SIZE, 1)
+        )
 
-########### LoRA + RoPE + RMS #############
+        self.similarity_classifier = nn.Sequential(
+            nn.Linear(1, BERT_HIDDEN_SIZE),
+            RMSNorm(BERT_HIDDEN_SIZE),
+            nn.GELU(),
+            nn.Dropout(config.hidden_dropout_prob),
+            nn.Linear(BERT_HIDDEN_SIZE, 1)
+        )
 
-class MutitaskBERT_LoRA_RoPE_RMS(MultitaskBERT):
-    '''
-    This module should use BERT for 3 tasks:
+########### End of RMSNorm #############
 
-    - Sentiment classification (predict_sentiment)
-    - Paraphrase detection (predict_paraphrase)
-    - Semantic Textual Similarity (predict_similarity)
-    '''
-
-    def __init__(self, config):
-        super(MutitaskBERT_LoRA_RoPE_RMS, self).__init__(config)
-        self.config = config
-        self.bert = RMSRoBertModel.from_pretrained('bert-base-uncased')
-        add_lora_layers(self, r=8, lora_alpha=16)
-        freeze_model(self)  # freeze the non-LoRA parameters
-
-########### End of LoRA + RoPE + RMS ###############
-
-########### LoRA + RoPE + RMS #############
+########### SwiGLU #############
 
 
 class SwiGLU(nn.Module):
     def __init__(self, hidden_size):
         super(SwiGLU, self).__init__()
-        self.hidden_size = hidden_size
-        self.linear = nn.Linear(hidden_size, hidden_size * 2)
+        self.linear1 = nn.Linear(
+            hidden_size, hidden_size)
+        self.linear2 = nn.Linear(
+            hidden_size, hidden_size)
 
     def forward(self, x):
-        x, gate = self.linear(x).chunk(2, dim=-1)
-        return x * F.gelu(gate)
+        interm = self.linear1(x)
+        return interm * F.sigmoid(interm) + self.linear2(x)
 
 
-class MutitaskBERT_LoRA_RoPE_RMS_SwiGLU(MultitaskBERT):
-    '''
-    This module should use BERT for 3 tasks:
-
-    - Sentiment classification (predict_sentiment)
-    - Paraphrase detection (predict_paraphrase)
-    - Semantic Textual Similarity (predict_similarity)
-    '''
-
+class MultitaskBERT_SwiGLU(MultitaskBERT):
     def __init__(self, config):
-        super(MutitaskBERT_LoRA_RoPE_RMS_SwiGLU, self).__init__(config)
+        super(MultitaskBERT_SwiGLU, self).__init__(config)
         self.config = config
-        self.bert = SRMSRoBertModel.from_pretrained('bert-base-uncased')
-        add_lora_layers(self, r=8, lora_alpha=16)
-        freeze_model(self)  # freeze the non-LoRA parameters
 
         self.sentiment_classifier = nn.Sequential(
             nn.Linear(BERT_HIDDEN_SIZE, BERT_HIDDEN_SIZE),
@@ -438,77 +438,44 @@ class MutitaskBERT_LoRA_RoPE_RMS_SwiGLU(MultitaskBERT):
             nn.Linear(BERT_HIDDEN_SIZE, 1)
         )
 
-    def forward(self, input_ids, attention_mask):
-        'Takes a batch of sentences and produces embeddings for them.'
-        # The final BERT embedding is the hidden state of [CLS] token (the first token)
-        # Here, you can start by just returning the embeddings straight from BERT.
-        # When thinking of improvements, you can later try modifying this
-        # (e.g., by adding other layers).
-        # TODO
-        # raise NotImplementedError
-        outputs = self.bert(input_ids, attention_mask)
-        cls_output = outputs['pooler_output']
+########### End of SwiGLU ###############
 
-        return cls_output
 
-    def predict_sentiment(self, input_ids, attention_mask):
-        '''Given a batch of sentences, outputs logits for classifying sentiment.
-        There are 5 sentiment classes:
-        (0 - negative, 1- somewhat negative, 2- neutral, 3- somewhat positive, 4- positive)
-        Thus, your output should contain 5 logits for each sentence.
-        '''
-        # TODO
-        # raise NotImplementedError
-        # Get the BERT embeddings
-        embeddings = self.forward(input_ids, attention_mask)
+class MultitaskBERT_combined(MultitaskBERT):
+    def __init__(self, config):
+        super(MultitaskBERT_combined, self).__init__(config)
+        self.config = config
 
-        # Pass the embeddings through the sentiment classifier
-        logits = self.sentiment_classifier(self.dropout(embeddings))
-        return logits
+        self.sentiment_classifier = nn.Sequential(
+            nn.Linear(BERT_HIDDEN_SIZE, BERT_HIDDEN_SIZE),
+            RMSNorm(BERT_HIDDEN_SIZE),
+            SwiGLU(BERT_HIDDEN_SIZE),
+            nn.Dropout(config.hidden_dropout_prob),
+            nn.Linear(BERT_HIDDEN_SIZE, N_SENTIMENT_CLASSES)
+        )
 
-    def predict_paraphrase(self,
-                           input_ids_1, attention_mask_1,
-                           input_ids_2, attention_mask_2):
-        '''Given a batch of pairs of sentences, outputs a single logit for predicting whether they are paraphrases.
-        Note that your output should be unnormalized (a logit); it will be passed to the sigmoid function
-        during evaluation, and handled as a logit by the appropriate loss function.
-        '''
-        # TODO
-        # raise NotImplementedError
+        self.paraphrase_classifier = nn.Sequential(
+            nn.Linear(BERT_HIDDEN_SIZE * 2, BERT_HIDDEN_SIZE),
+            RMSNorm(BERT_HIDDEN_SIZE),
+            SwiGLU(BERT_HIDDEN_SIZE),
+            nn.Dropout(config.hidden_dropout_prob),
+            nn.Linear(BERT_HIDDEN_SIZE, 1)
+        )
 
-        # Get BERT embeddings for both sentences in each pair
-        cls_embedding_1 = self.forward(input_ids_1, attention_mask_1)
-        cls_embedding_2 = self.forward(input_ids_2, attention_mask_2)
+        self.similarity_classifier = nn.Sequential(
+            nn.Linear(1, BERT_HIDDEN_SIZE),
+            RMSNorm(BERT_HIDDEN_SIZE),
+            SwiGLU(BERT_HIDDEN_SIZE),
+            nn.Dropout(config.hidden_dropout_prob),
+            nn.Linear(BERT_HIDDEN_SIZE, 1)
+        )
 
-        out1 = self.dropout(cls_embedding_1)
-        out2 = self.dropout(cls_embedding_2)
-
-        # Concatenate the embeddings
-        embeddings = torch.cat((out1, out2), dim=1)
-
-        # Pass the concatenated embeddings through the paraphrase classifier
-        logits = self.paraphrase_classifier(embeddings)
-
-        return logits
-
-    def predict_similarity(self,
-                           input_ids_1, attention_mask_1,
-                           input_ids_2, attention_mask_2):
-        '''Given a batch of pairs of sentences, outputs a single logit corresponding to how similar they are.
-        Note that your output should be unnormalized (a logit).
-        '''
-        # TODO
-        # raise NotImplementedError
-        # Get BERT embeddings for both sentences in each pair
-        cls_embedding_1 = self.forward(input_ids_1, attention_mask_1)
-        cls_embedding_2 = self.forward(input_ids_2, attention_mask_2)
-
-        # Calculate cosine similarity between the embeddings
-        logits = F.cosine_similarity(cls_embedding_1, cls_embedding_2, dim=1)
-
-        return logits
-
-########### End of LoRA + RoPE + RMS ###############
+        add_lora_layers(self)
+        for name, param in self.named_parameters():
+            if "lora" not in name and "classifier" not in name and "bias" not in name:
+                param.requires_grad = False
+            else:
+                param.requires_grad = True
 
 
 def save_model(model, optimizer, args, config, filepath):
@@ -531,9 +498,9 @@ def train_multitask(args, save_metrics, model_name):
     model_dict = {
         'baseline': MultitaskBERT,
         'LoRA': MultitaskBERT_LoRA,
-        'RoPE': MutitaskBERT_LoRA_RoPE,
-        'RMS': MutitaskBERT_LoRA_RoPE_RMS,
-        'SwiGLU': MutitaskBERT_LoRA_RoPE_RMS_SwiGLU
+        'RMS': MultitaskBERT_RMS,
+        'SwiGLU': MultitaskBERT_SwiGLU,
+        'combined': MultitaskBERT_combined
     }
 
     device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
@@ -693,12 +660,10 @@ def test_model(args, save_metrics, model_name):
     model_dict = {
         'baseline': MultitaskBERT,
         'LoRA': MultitaskBERT_LoRA,
-        'RoPE': MutitaskBERT_LoRA_RoPE,
-        'RMS': MutitaskBERT_LoRA_RoPE_RMS,
-        'SwiGLU': MutitaskBERT_LoRA_RoPE_RMS_SwiGLU
+        'RMS': MultitaskBERT_RMS,
+        'SwiGLU': MultitaskBERT_SwiGLU,
+        'combined': MultitaskBERT_combined
     }
-
-
 
     with torch.no_grad():
         device = torch.device('cuda') if args.use_gpu else torch.device('cpu')
@@ -805,7 +770,8 @@ def main():
     with open(f'./stats/multitask_{model_name}_saved_metrics.json', 'w') as f:
         json.dump(save_metrics, f, indent=4)
 
-    print(f'Metrics saved to ./stats/multitask_{model_name}_saved_metrics.json')
+    print(
+        f'Metrics saved to ./stats/multitask_{model_name}_saved_metrics.json')
 
 
 if __name__ == "__main__":
