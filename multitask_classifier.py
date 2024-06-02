@@ -165,7 +165,7 @@ class MultitaskBERT(nn.Module):
 
 
 ########### LoRA #############
-""" 
+"""
 Modified from: https://github.com/alexriggio/BERT-LoRA-TensorRT
 Credits to: https://github.com/alexriggio/BERT-LoRA-TensorRT
 """
@@ -173,14 +173,14 @@ Credits to: https://github.com/alexriggio/BERT-LoRA-TensorRT
 
 class LinearLoRA(nn.Module):
     """
-    A low-rank adapted linear layer. 
+    A low-rank adapted linear layer.
 
     Args:
-        in_dim: int = An integer representing the input dimension of the linear layer 
+        in_dim: int = An integer representing the input dimension of the linear layer
         out_dim: int = An integer representing the output dimension of the linear layer
         r: int = An integer representing the rank of the low-rank approximated matrices
-        lora_alpha: int = An integer representing the numerator of the scaling constant alpha / r 
-        lora_dropout: float = A float between 0 and 1 representing the dropout probability      
+        lora_alpha: int = An integer representing the numerator of the scaling constant alpha / r
+        lora_dropout: float = A float between 0 and 1 representing the dropout probability
     """
 
     def __init__(
@@ -205,8 +205,8 @@ class LinearLoRA(nn.Module):
 
         # create the low-rank A matrix and initialize with same method as in Hugging Face PEFT library
         self.lora_A = nn.Linear(in_dim, r, bias=True)
-        # nn.init.kaiming_uniform_(self.lora_A.weight, a=math.sqrt(5))
-        nn.init.normal_(self.lora_A.weight, mean=0.0, std=0.02)
+        nn.init.kaiming_uniform_(self.lora_A.weight, a=math.sqrt(5))
+        # nn.init.normal_(self.lora_A.weight, mean=0.0, std=0.02)
 
         # create the low-rank B matrix and initialize to zero
         self.lora_B = nn.Linear(r, out_dim, bias=True)
@@ -252,16 +252,16 @@ def add_lora_layers(
     ignore_layers: List[int] = []
 ):
     """
-        Replaces chosen linear modules with LoRA equivalents. 
+        Replaces chosen linear modules with LoRA equivalents.
 
         Args:
             model: torch.nn.Module = The PyTorch model to be used
             module_names: Tuple = A tuple containing the names of the linear layers to replace
                 Ex. ("query") to replace the linear modules with "query" in the name --> bert.encoder.layer.0.attention.self.query
-            r: int = 
-            lora_alpha: int = An integer representing the numerator of the scaling constant alpha / r 
+            r: int =
+            lora_alpha: int = An integer representing the numerator of the scaling constant alpha / r
             lora_dropout: float = A float between 0 and 1 representing the dropout probability
-            ignore_layers: list = A list with the indices of all BERT layers NOT to add LoRA modules 
+            ignore_layers: list = A list with the indices of all BERT layers NOT to add LoRA modules
         """
     module_types: Tuple = (nn.Linear,)
 
@@ -303,14 +303,14 @@ def create_linear(module):
 
 def merge_lora_layers(model, module_names: Tuple = ("query", "value"), dropout=0.1):
     """
-        Replaces LoRA modules with their original linear equivalents. 
+        Replaces LoRA modules with their original linear equivalents.
 
         Args:
             model: torch.nn.Module = The PyTorch model to be used
             module_names: Tuple = A tuple containing the names of the LoRA layers to replace
                 Ex. ("query") to replace the LoRA modules with "query" in the name --> bert.encoder.layer.0.attention.self.query
-            r: int = 
-            dropout: float = A float between 0 and 1 representing the dropout probability    
+            r: int =
+            dropout: float = A float between 0 and 1 representing the dropout probability
         """
     # enable dropout in frozen layers
     for module in model.modules():
@@ -394,19 +394,63 @@ class MultitaskBERT_RMS(MultitaskBERT):
 ########### End of RMSNorm #############
 
 ########### SwiGLU #############
+# 111859591 if r = 64
+#
 
 
 class SwiGLU(nn.Module):
-    def __init__(self, hidden_size):
+    def __init__(self,
+                 hidden_size: int = 768,
+                 r: int = 4,
+                 lora_alpha: float = 16):
+
         super(SwiGLU, self).__init__()
-        self.linear1 = nn.Linear(
-            hidden_size, hidden_size)
-        self.linear2 = nn.Linear(
-            hidden_size, hidden_size)
+        self.r = r
+        self.lora_alpha = lora_alpha
+
+        self.linear1in = nn.Linear(
+            hidden_size, r, bias=True)
+        self.linear1out = nn.Linear(
+            r, hidden_size, bias=True)
+        self.linear2in = nn.Linear(
+            hidden_size, r, bias=True)
+        self.linear2out = nn.Linear(
+            r, hidden_size, bias=True)
+
+        nn.init.kaiming_uniform_(self.linear1in.weight, a=math.sqrt(5))
+        nn.init.kaiming_uniform_(self.linear2in.weight, a=math.sqrt(5))
+
+        nn.init.constant_(self.linear1out.weight, 0)
+        nn.init.constant_(self.linear2out.weight, 0)
+
+        self.scaling = self.lora_alpha / self.r
 
     def forward(self, x):
-        interm = self.linear1(x)
-        return interm * F.sigmoid(interm) + self.linear2(x)
+        interm = self.linear1in(x)
+        interm = self.linear1out(interm)
+        interm = interm * self.scaling
+
+        value = self.linear2in(x)
+        value = self.linear2out(value)
+        value = value * self.scaling
+
+        return interm * F.sigmoid(interm) + value
+
+
+class SwigNet(nn.Module):
+    def __init__(self, hidden_size: int = 768, intermediate_size: int = 768) -> None:
+        super().__init__()
+
+        self.w1 = nn.Linear(hidden_size, intermediate_size, bias=False)
+        self.w2 = nn.Linear(intermediate_size, hidden_size, bias=False)
+        self.w3 = nn.Linear(hidden_size, intermediate_size, bias=False)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x: (batch_size, seq_len, hidden_size)
+        # w1(x) -> (batch_size, seq_len, intermediate_size)
+        # w1(x) -> (batch_size, seq_len, intermediate_size)
+        # w2(*) -> (batch_size, seq_len, hidden_size)
+        return self.w2(F.silu(self.w1(x)) * self.w3(x))
 
 
 class MultitaskBERT_SwiGLU(MultitaskBERT):
@@ -417,7 +461,7 @@ class MultitaskBERT_SwiGLU(MultitaskBERT):
         self.sentiment_classifier = nn.Sequential(
             nn.Linear(BERT_HIDDEN_SIZE, BERT_HIDDEN_SIZE),
             nn.BatchNorm1d(BERT_HIDDEN_SIZE),
-            SwiGLU(BERT_HIDDEN_SIZE),
+            nn.GELU(),
             nn.Dropout(config.hidden_dropout_prob),
             nn.Linear(BERT_HIDDEN_SIZE, N_SENTIMENT_CLASSES)
         )
@@ -425,7 +469,7 @@ class MultitaskBERT_SwiGLU(MultitaskBERT):
         self.paraphrase_classifier = nn.Sequential(
             nn.Linear(BERT_HIDDEN_SIZE * 2, BERT_HIDDEN_SIZE),
             nn.BatchNorm1d(BERT_HIDDEN_SIZE),
-            SwiGLU(BERT_HIDDEN_SIZE),
+            nn.GELU(),
             nn.Dropout(config.hidden_dropout_prob),
             nn.Linear(BERT_HIDDEN_SIZE, 1)
         )
@@ -433,7 +477,7 @@ class MultitaskBERT_SwiGLU(MultitaskBERT):
         self.similarity_classifier = nn.Sequential(
             nn.Linear(1, BERT_HIDDEN_SIZE),
             nn.BatchNorm1d(BERT_HIDDEN_SIZE),
-            SwiGLU(BERT_HIDDEN_SIZE),
+            nn.GELU(),
             nn.Dropout(config.hidden_dropout_prob),
             nn.Linear(BERT_HIDDEN_SIZE, 1)
         )

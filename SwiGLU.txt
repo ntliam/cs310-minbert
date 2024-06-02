@@ -1,4 +1,4 @@
-Total Trainable Parameters: 114808327
+Total Trainable Parameters: 111264775
 
 <bound method Module.parameters of MultitaskBERT_SwiGLU(
   (bert): BertModel(
@@ -30,30 +30,21 @@ Total Trainable Parameters: 114808327
   (sentiment_classifier): Sequential(
     (0): Linear(in_features=768, out_features=768, bias=True)
     (1): BatchNorm1d(768, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (2): SwiGLU(
-      (linear1): Linear(in_features=768, out_features=768, bias=True)
-      (linear2): Linear(in_features=768, out_features=768, bias=True)
-    )
+    (2): GELU(approximate='none')
     (3): Dropout(p=0.3, inplace=False)
     (4): Linear(in_features=768, out_features=5, bias=True)
   )
   (paraphrase_classifier): Sequential(
     (0): Linear(in_features=1536, out_features=768, bias=True)
     (1): BatchNorm1d(768, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (2): SwiGLU(
-      (linear1): Linear(in_features=768, out_features=768, bias=True)
-      (linear2): Linear(in_features=768, out_features=768, bias=True)
-    )
+    (2): GELU(approximate='none')
     (3): Dropout(p=0.3, inplace=False)
     (4): Linear(in_features=768, out_features=1, bias=True)
   )
   (similarity_classifier): Sequential(
     (0): Linear(in_features=1, out_features=768, bias=True)
     (1): BatchNorm1d(768, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-    (2): SwiGLU(
-      (linear1): Linear(in_features=768, out_features=768, bias=True)
-      (linear2): Linear(in_features=768, out_features=768, bias=True)
-    )
+    (2): GELU(approximate='none')
     (3): Dropout(p=0.3, inplace=False)
     (4): Linear(in_features=768, out_features=1, bias=True)
   )
