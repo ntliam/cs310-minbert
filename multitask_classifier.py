@@ -246,8 +246,10 @@ def create_lora(module, r, lora_dropout, lora_alpha):
 def add_lora_layers(
     model,
     module_names: Tuple = ("query", "value", "key"),
-    r: int = 64,
-    lora_alpha: float = 256,
+    # r: int = 64,
+    # lora_alpha: float = 256,
+    r: int = 2,
+    lora_alpha: float = 16,
     lora_dropout: float = 0.3,
     ignore_layers: List[int] = []
 ):
@@ -323,7 +325,6 @@ def merge_lora_layers(model, module_names: Tuple = ("query", "value"), dropout=0
             setattr(model, name, temp_linear)
         else:
             merge_lora_layers(module, module_names=module_names, dropout=0.1)
-
 
 class MultitaskBERT_LoRA(MultitaskBERT):
     def __init__(self, config):
@@ -658,8 +659,8 @@ def train_multitask(args, save_metrics, model_name):
 
         train_loss = train_loss / num_batches
 
-        sentiment_accuracy, sst_y_pred, sst_sent_ids, \
-            paraphrase_accuracy, para_y_pred, para_sent_ids, \
+        paraphrase_accuracy, para_y_pred, para_sent_ids, \
+            sentiment_accuracy, sst_y_pred, sst_sent_ids, \
             sts_corr, sts_y_pred, sts_sent_ids = model_eval_multitask(
                 sst_dev_dataloader, para_dev_dataloader, sts_dev_dataloader, model, device
             )
