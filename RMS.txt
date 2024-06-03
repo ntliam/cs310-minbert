@@ -1,4 +1,4 @@
-Total Trainable Parameters: 111262471 
+Total Trainable Parameters: 111262471
 
 <bound method Module.parameters of MultitaskBERT_RMS(
   (bert): BertModel(

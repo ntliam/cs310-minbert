@@ -1,4 +1,4 @@
-Total Trainable Parameters: 8995591
+Total Trainable Parameters: 5493535
 
 <bound method Module.parameters of MultitaskBERT_combined(
   (bert): BertModel(
@@ -46,8 +46,10 @@ Total Trainable Parameters: 8995591
     (0): Linear(in_features=768, out_features=768, bias=True)
     (1): RMSNorm()
     (2): SwiGLU(
-      (linear1): Linear(in_features=768, out_features=768, bias=True)
-      (linear2): Linear(in_features=768, out_features=768, bias=True)
+      (linear1in): Linear(in_features=768, out_features=4, bias=True)
+      (linear1out): Linear(in_features=4, out_features=768, bias=True)
+      (linear2in): Linear(in_features=768, out_features=4, bias=True)
+      (linear2out): Linear(in_features=4, out_features=768, bias=True)
     )
     (3): Dropout(p=0.0, inplace=False)
     (4): Linear(in_features=768, out_features=5, bias=True)
@@ -56,8 +58,10 @@ Total Trainable Parameters: 8995591
     (0): Linear(in_features=1536, out_features=768, bias=True)
     (1): RMSNorm()
     (2): SwiGLU(
-      (linear1): Linear(in_features=768, out_features=768, bias=True)
-      (linear2): Linear(in_features=768, out_features=768, bias=True)
+      (linear1in): Linear(in_features=768, out_features=4, bias=True)
+      (linear1out): Linear(in_features=4, out_features=768, bias=True)
+      (linear2in): Linear(in_features=768, out_features=4, bias=True)
+      (linear2out): Linear(in_features=4, out_features=768, bias=True)
     )
     (3): Dropout(p=0.0, inplace=False)
     (4): Linear(in_features=768, out_features=1, bias=True)
@@ -66,8 +70,10 @@ Total Trainable Parameters: 8995591
     (0): Linear(in_features=1, out_features=768, bias=True)
     (1): RMSNorm()
     (2): SwiGLU(
-      (linear1): Linear(in_features=768, out_features=768, bias=True)
-      (linear2): Linear(in_features=768, out_features=768, bias=True)
+      (linear1in): Linear(in_features=768, out_features=4, bias=True)
+      (linear1out): Linear(in_features=4, out_features=768, bias=True)
+      (linear2in): Linear(in_features=768, out_features=4, bias=True)
+      (linear2out): Linear(in_features=4, out_features=768, bias=True)
     )
     (3): Dropout(p=0.0, inplace=False)
     (4): Linear(in_features=768, out_features=1, bias=True)

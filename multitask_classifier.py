@@ -776,17 +776,18 @@ def get_args():
 def main():
     args = get_args()
     # save path
-    models = ['baseline', 'LoRA', 'RoPE', 'RMS', 'SwiGLU']
+    models = ['baseline', 'LoRA', 'RMS', 'SwiGLU', 'combined']
 
     """
     0: Baseline BERT
     1: BERT + LoRA
-    2: BERT + LoRA + RoPE
-    3: BERT + LoRA + RoPE + RMS
-    4: BERT + LoRA + RoPE + RMS + SwiGLU
+    2: BERT + RMS
+    3: BERT + SwiGLU
+    4: BERT + LoRA + RMS + SwiGLU
     """
 
-    model_name = models[2]
+    model_index = 4
+    model_name = models[model_index]
 
     args.filepath = f'{args.option}-{args.epochs}-{args.lr}-multitask-{model_name}.pt'
     seed_everything(args.seed)  # fix the seed for reproducibility
