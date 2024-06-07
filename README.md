@@ -1,4 +1,4 @@
-# SUSTech CS310 Final Project - Enhancing Multitask BERT with LoRA, RMSNorm, and SwiGLU
+# SUSTech CS310 Final Project - Optimizing Multitasking with BERT: A Preliminary Study
 #### Author: Kenneth Zhang - Weitao Yan - Lam Nguyen
 
 This repository contains the code for the final project of the SUSTech CS310 course, which inherits the skeleton code and base project from the Stanford CS 224N course (https://github.com/gpoesia/minbert-default-final-project). The project focuses on enhancing the multitask learning capabilities of the BERT model. The initial project aimed to implement key components of the BERT model and use its embeddings for three downstream tasks: sentiment classification, paraphrase detection, and semantic similarity. Building on this foundation, we experimented with various enhancements, including LoRA, RMSNorm, and SwiGLU, to improve the model's performance.
