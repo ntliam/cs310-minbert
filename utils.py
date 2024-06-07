@@ -90,7 +90,7 @@ def visualize_json(json_path):
     plt.tight_layout()
 
 
-def visualize_multitask(json_path):
+def load_data_multitask(json_path):
     name = json_path.split('/')[-1].split('_')[0]
 
     with open(json_path, 'r') as file:
@@ -109,6 +109,15 @@ def visualize_multitask(json_path):
     test_sentiment_accuracy = data["test_sentiment_accuracy"]
     test_paraphrase_accuracy = data["test_paraphrase_accuracy"]
     test_sts_corr = data["test_sts_corr"]
+
+    return epochs, train_loss, train_sentiment_acc, train_paraphrase_acc, train_sts_corr, train_avg, \
+    test_sentiment_accuracy, test_paraphrase_accuracy, test_sts_corr
+
+
+def visualize_multitask(json_path):
+    epochs, train_loss, train_sentiment_acc, train_paraphrase_acc, train_sts_corr, train_avg, \
+    test_sentiment_accuracy, test_paraphrase_accuracy, test_sts_corr = load_data_multitask(json_path)
+    
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
 
