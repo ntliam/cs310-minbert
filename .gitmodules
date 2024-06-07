@@ -1,0 +1,4 @@
+[submodule "ChatBabel"]
+	path = ChatBabel
+	url = git@github.com:Nore-i/mindspore-trio-proj.git
+	branch = bert
